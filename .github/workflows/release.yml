@@ -143,3 +143,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: gh release create "${RELEASE_TAG}" dist/* --verify-tag --generate-notes --title "${RELEASE_TAG}"
+
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not configured; skipping tap update."
+            exit 0
+          fi
+
+          gh api repos/rtcoder/homebrew-tap/dispatches \
+            --method POST \
+            --field event_type=ytrack-release \
+            --field client_payload[tag]="${RELEASE_TAG}"
