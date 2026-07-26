@@ -643,3 +643,20 @@ func TestClientReturnsHTTPErrorBody(t *testing.T) {
 		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
+
+func TestClientReturnsParsedYouTrackErrorDescription(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"Bad Request","error_description":"Expected State: Fixed"}`))
+	}))
+	defer server.Close()
+
+	_, _, err := NewClient(server.URL, "perm:token").CreateIssue(context.Background(), "0-1", "Crash", "")
+	if err == nil {
+		t.Fatal("CreateIssue() error = nil, want HTTP error")
+	}
+	want := "youtrack API error: status 400: Expected State: Fixed"
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}

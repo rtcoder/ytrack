@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -109,6 +110,89 @@ func TestIssueCreateAcceptsMetadataOptions(t *testing.T) {
 	}
 	if !strings.Contains(out, `Created ART-123: "Crash on save"`) {
 		t.Fatalf("issue create output = %q, want created issue", out)
+	}
+}
+
+func TestIssueCreatePrintsIssueURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":"2-1","idReadable":"ART-123","summary":"Crash on save"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-1")
+
+	out := runCLI(t, paths, "issue", "create", "Crash on save")
+
+	if !strings.Contains(out, "url: "+server.URL+"/issue/ART-123") {
+		t.Fatalf("issue create output = %q, want issue URL", out)
+	}
+}
+
+func TestIssueCreateReadsDescriptionFile(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"2-1","idReadable":"ART-123","summary":"Crash on save"}`))
+	}))
+	defer server.Close()
+
+	temp := t.TempDir()
+	descPath := filepath.Join(temp, "description.md")
+	if err := os.WriteFile(descPath, []byte("Steps from file\n"), 0o600); err != nil {
+		t.Fatalf("write description file: %v", err)
+	}
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-1")
+
+	runCLI(t, paths, "issue", "create", "Crash on save", "--description-file", descPath)
+
+	if gotPayload["description"] != "Steps from file\n" {
+		t.Fatalf("payload = %#v, want file description", gotPayload)
+	}
+}
+
+func TestIssueCreateReadsDescriptionFromStdin(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"2-1","idReadable":"ART-123","summary":"Crash on save"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-1")
+
+	runCLIWithInput(t, paths, "Steps from stdin\n", "issue", "create", "Crash on save", "--description-file", "-")
+
+	if gotPayload["description"] != "Steps from stdin\n" {
+		t.Fatalf("payload = %#v, want stdin description", gotPayload)
+	}
+}
+
+func TestIssueCloseSetsStatusToFixed(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"issues":[{"id":"3-1","idReadable":"YR-14","summary":"Add init"}],"commands":"State Fixed","errors":[]}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "close", "YR-14")
+
+	if gotPayload["query"] != "State Fixed" {
+		t.Fatalf("payload = %#v, want State Fixed command", gotPayload)
+	}
+	if !strings.Contains(out, "Updated YR-14 to Fixed") {
+		t.Fatalf("issue close output = %q, want close confirmation", out)
 	}
 }
 

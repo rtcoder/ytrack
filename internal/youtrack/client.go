@@ -485,7 +485,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("youtrack API error: status %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		return nil, fmt.Errorf("youtrack API error: status %d: %s", resp.StatusCode, formatAPIError(raw))
 	}
 	return raw, nil
 }
@@ -581,4 +581,21 @@ func createIssueCustomFields(opts CreateIssueOptions) []map[string]any {
 		})
 	}
 	return fields
+}
+
+func formatAPIError(raw []byte) string {
+	trimmed := strings.TrimSpace(string(raw))
+	var body struct {
+		Description string `json:"error_description"`
+		Error       string `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &body); err == nil {
+		if body.Description != "" {
+			return body.Description
+		}
+		if body.Error != "" {
+			return body.Error
+		}
+	}
+	return trimmed
 }

@@ -221,6 +221,19 @@ func (a *app) newIssueCommand() *cobra.Command {
 			if len(args) == 2 {
 				description = args[1]
 			}
+			descriptionFile, err := cmd.Flags().GetString("description-file")
+			if err != nil {
+				return err
+			}
+			if descriptionFile != "" {
+				if description != "" {
+					return fmt.Errorf("description argument cannot be used with --description-file")
+				}
+				description, err = a.readDescriptionFile(descriptionFile)
+				if err != nil {
+					return err
+				}
+			}
 			client := youtrack.NewClient(cfg.URL, cfg.Token)
 			opts, err := createIssueOptionsFromFlags(cmd, client)
 			if err != nil {
@@ -235,9 +248,11 @@ func (a *app) newIssueCommand() *cobra.Command {
 				return nil
 			}
 			fmt.Fprintf(a.out, "Created %s: %q\n", issue.IDReadable, issue.Summary)
+			fmt.Fprintf(a.out, "url: %s/issue/%s\n", strings.TrimRight(cfg.URL, "/"), issue.IDReadable)
 			return nil
 		},
 	}
+	createCmd.Flags().String("description-file", "", "read issue description from a file, or '-' for stdin")
 	createCmd.Flags().String("type", "", "issue type")
 	createCmd.Flags().String("assignee", "", "issue assignee as me, user ID, login, name, or email")
 	createCmd.Flags().String("priority", "", "issue priority")
@@ -429,6 +444,31 @@ func (a *app) newIssueCommand() *cobra.Command {
 			return nil
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "close <issue-id>",
+		Short: "Close a YouTrack issue as Fixed",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			result, raw, err := client.SetStatus(context.Background(), args[0], "Fixed")
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			if len(result.Issues) > 0 {
+				fmt.Fprintf(a.out, "Updated %s to Fixed\n", result.Issues[0].IDReadable)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s to Fixed\n", args[0])
+			return nil
+		},
+	})
 	return cmd
 }
 
@@ -438,6 +478,20 @@ func (a *app) updateIssue(issueID string, update youtrack.IssueUpdate) (youtrack
 		return youtrack.ProjectIssue{}, nil, err
 	}
 	return client.UpdateIssue(context.Background(), issueID, update)
+}
+
+func (a *app) readDescriptionFile(path string) (string, error) {
+	var content []byte
+	var err error
+	if path == "-" {
+		content, err = io.ReadAll(a.in)
+	} else {
+		content, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return "", fmt.Errorf("read description file: %w", err)
+	}
+	return string(content), nil
 }
 
 func (a *app) newUserCommand() *cobra.Command {

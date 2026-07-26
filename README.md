@@ -248,6 +248,8 @@ ytrack unset-project-id
 ```sh
 ytrack issue create <summary>
 ytrack issue create <summary> <description>
+ytrack issue create <summary> --description-file <path>
+ytrack issue create <summary> --description-file -
 ytrack issue create <summary> [description] [--type <type>] [--assignee <user>] [--priority <priority>] [--version <version>]
 ytrack issue show <issue-id>
 ytrack issue edit <issue-id> [--title <title>] [--description <description>] [--type <type>] [--priority <priority>]
@@ -256,6 +258,7 @@ ytrack issue priority <issue-id> <priority>
 ytrack issue comment <issue-id> <text>
 ytrack issue assign <issue-id> <user>
 ytrack issue command <issue-id> <command>
+ytrack issue close <issue-id>
 ytrack issue status <issue-id> <status>
 ```
 
@@ -277,11 +280,19 @@ Create an issue with metadata:
 ytrack issue create "Crash on save" "Steps to reproduce..." --type Bug --assignee me --priority High --version v0.1.10
 ```
 
+Create an issue with a longer description from a file or stdin:
+
+```sh
+ytrack issue create "Crash on save" --description-file bug.md
+cat bug.md | ytrack issue create "Crash on save" --description-file -
+```
+
 Change issue status:
 
 ```sh
 ytrack issue status ART-123 Done
 ytrack issue status ART-123 "In Progress"
+ytrack issue close ART-123
 ```
 
 Show issue details:
@@ -441,10 +452,12 @@ Without `--json`, successful commands print human-readable output:
 
 ```text
 Created ART-123: "Crash on save"
+url: https://youtrack.example.com/issue/ART-123
 Updated ART-123 to Done
 ```
 
-With `--json`, API-backed commands print the raw YouTrack response.
+With `--json`, API-backed commands print the raw YouTrack response. API error
+responses with `error_description` are printed as concise actionable messages.
 
 ## Required Configuration
 
