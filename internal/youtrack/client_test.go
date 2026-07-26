@@ -111,6 +111,144 @@ func TestSetStatusPostsCommandPayload(t *testing.T) {
 	}
 }
 
+func TestGetMeRequestsCurrentUserProfile(t *testing.T) {
+	var gotPath, gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+	}))
+	defer server.Close()
+
+	user, raw, err := NewClient(server.URL, "perm:token").GetMe(context.Background())
+	if err != nil {
+		t.Fatalf("GetMe() error = %v", err)
+	}
+
+	wantPath := "/api/users/me?fields=id,login,name,fullName,email"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if gotAuth != "Bearer perm:token" {
+		t.Fatalf("Authorization = %q, want bearer token", gotAuth)
+	}
+	if user.ID != "1-2" || user.Login != "rtcoder" || user.FullName != "Robert" || user.Email != "robert@example.com" || string(raw) == "" {
+		t.Fatalf("GetMe() user=%+v raw=%q, want parsed user and raw JSON", user, string(raw))
+	}
+}
+
+func TestListUsersRequestsLimitedUserFields(t *testing.T) {
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`[{"id":"24-55","login":"l.downton","name":"Luisa Downton","fullName":"Luisa Downton","email":"luisa@example.com","banned":false,"$type":"User"}]`))
+	}))
+	defer server.Close()
+
+	users, raw, err := NewClient(server.URL, "perm:token").ListUsers(context.Background(), 20, 5)
+	if err != nil {
+		t.Fatalf("ListUsers() error = %v", err)
+	}
+
+	wantPath := "/api/users?%24skip=5&%24top=20&fields=id%2Clogin%2Cname%2CfullName%2Cemail%2Cbanned"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if len(users) != 1 || users[0].ID != "24-55" || users[0].Login != "l.downton" || users[0].Banned {
+		t.Fatalf("ListUsers() users=%+v, want parsed active user", users)
+	}
+	if string(raw) == "" {
+		t.Fatalf("ListUsers() raw = empty, want raw JSON")
+	}
+}
+
+func TestGetUserRequestsSpecificUserProfile(t *testing.T) {
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`{"id":"24-55","login":"l.downton","name":"Luisa Downton","fullName":"Luisa Downton","email":"luisa@example.com","banned":false,"$type":"User"}`))
+	}))
+	defer server.Close()
+
+	user, raw, err := NewClient(server.URL, "perm:token").GetUser(context.Background(), "24-55")
+	if err != nil {
+		t.Fatalf("GetUser() error = %v", err)
+	}
+
+	wantPath := "/api/users/24-55?fields=id,login,name,fullName,email,banned"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if user.ID != "24-55" || user.Login != "l.downton" || user.FullName != "Luisa Downton" || string(raw) == "" {
+		t.Fatalf("GetUser() user=%+v raw=%q, want parsed user and raw JSON", user, string(raw))
+	}
+}
+
+func TestResolveUserFindsMeIDAndUniqueLogin(t *testing.T) {
+	var requested []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.RequestURI())
+		switch r.URL.Path {
+		case "/api/users/me":
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/users/24-55":
+			_, _ = w.Write([]byte(`{"id":"24-55","login":"l.downton","name":"Luisa Downton","fullName":"Luisa Downton","email":"luisa@example.com","banned":false,"$type":"User"}`))
+		case "/api/users":
+			_, _ = w.Write([]byte(`[
+				{"id":"24-55","login":"l.downton","name":"Luisa Downton","fullName":"Luisa Downton","email":"luisa@example.com","banned":false,"$type":"User"},
+				{"id":"24-56","login":"m.scott","name":"Michael Scott","fullName":"Michael Scott","email":"michael@example.com","banned":false,"$type":"User"}
+			]`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "perm:token")
+	me, err := client.ResolveUser(context.Background(), "me")
+	if err != nil {
+		t.Fatalf("ResolveUser(me) error = %v", err)
+	}
+	byID, err := client.ResolveUser(context.Background(), "24-55")
+	if err != nil {
+		t.Fatalf("ResolveUser(id) error = %v", err)
+	}
+	byLogin, err := client.ResolveUser(context.Background(), "m.scott")
+	if err != nil {
+		t.Fatalf("ResolveUser(login) error = %v", err)
+	}
+
+	if me.ID != "1-2" || byID.Login != "l.downton" || byLogin.ID != "24-56" {
+		t.Fatalf("resolved users: me=%+v byID=%+v byLogin=%+v", me, byID, byLogin)
+	}
+	if len(requested) != 3 {
+		t.Fatalf("requested paths = %#v, want one request per resolution", requested)
+	}
+}
+
+func TestResolveUserReportsAmbiguousMatches(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"id":"24-55","login":"l.downton","name":"Luisa Downton","fullName":"Luisa Downton","email":"luisa@example.com","banned":false,"$type":"User"},
+			{"id":"24-56","login":"l.doe","name":"Luisa Doe","fullName":"Luisa Doe","email":"luisa.doe@example.com","banned":false,"$type":"User"}
+		]`))
+	}))
+	defer server.Close()
+
+	_, err := NewClient(server.URL, "perm:token").ResolveUser(context.Background(), "luisa")
+	if err == nil {
+		t.Fatal("ResolveUser() error = nil, want ambiguous user error")
+	}
+	want := `ambiguous user "luisa", matches: 24-55 l.downton (Luisa Downton), 24-56 l.doe (Luisa Doe)`
+	if err.Error() != want {
+		t.Fatalf("ResolveUser() error = %q, want %q", err.Error(), want)
+	}
+}
+
 func TestClientReturnsHTTPErrorBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad token", http.StatusUnauthorized)

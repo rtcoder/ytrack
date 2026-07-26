@@ -11,6 +11,7 @@ The project is an early MVP. It currently supports:
 - local per-directory URL, token, and project configuration
 - creating YouTrack issues
 - changing issue status through YouTrack commands
+- inspecting and resolving YouTrack users
 - raw JSON output for API-backed commands
 
 ## Installation
@@ -107,6 +108,12 @@ Move an issue to another status:
 
 ```sh
 ytrack issue status ART-123 Done
+```
+
+Show the current user:
+
+```sh
+ytrack user me
 ```
 
 ## Configuration Model
@@ -262,6 +269,40 @@ ytrack issue status ART-123 "In Progress"
 State <status>
 ```
 
+### Users
+
+```sh
+ytrack user me
+ytrack user list
+ytrack user list --top <count>
+ytrack user list --skip <count>
+ytrack user find <query>
+```
+
+Show the current user for the configured token:
+
+```sh
+ytrack user me
+```
+
+List users:
+
+```sh
+ytrack user list
+ytrack user list --top 20
+```
+
+Find one user by ID, `me`, login, name, or email:
+
+```sh
+ytrack user find me
+ytrack user find 24-55
+ytrack user find m.scott
+```
+
+If a search matches multiple users, `ytrack` prints an error with the matching
+IDs and logins so you can run the command again with a more specific value.
+
 ### JSON Output
 
 Use `--json` before the command:
@@ -270,6 +311,8 @@ Use `--json` before the command:
 ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
 ytrack --json issue status ART-123 Done
+ytrack --json user me
+ytrack --json user list --top 20
 ```
 
 Without `--json`, successful commands print human-readable output:
@@ -290,6 +333,11 @@ With `--json`, API-backed commands print the raw YouTrack response.
 - local `project_id`
 
 `issue status` requires:
+
+- `url`
+- `token`
+
+User commands require:
 
 - `url`
 - `token`

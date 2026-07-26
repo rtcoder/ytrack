@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"text/tabwriter"
 
 	"github.com/rtcoder/ytrack/internal/config"
 	"github.com/rtcoder/ytrack/internal/youtrack"
@@ -62,6 +64,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 	root.AddCommand(a.newLocalUnsetCommand("unset-project-id", "Unset local YouTrack project ID", "project_id"))
 	root.AddCommand(a.newShowCommand())
 	root.AddCommand(a.newIssueCommand())
+	root.AddCommand(a.newUserCommand())
 
 	return root
 }
@@ -252,10 +255,140 @@ func (a *app) newIssueCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) newUserCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "user",
+		Short: "Inspect YouTrack users",
+	}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "me",
+		Short: "Show the current YouTrack user",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			user, raw, err := client.GetMe(context.Background())
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			a.printUser(user)
+			return nil
+		},
+	})
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List YouTrack users",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			top, err := cmd.Flags().GetInt("top")
+			if err != nil {
+				return err
+			}
+			skip, err := cmd.Flags().GetInt("skip")
+			if err != nil {
+				return err
+			}
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			users, raw, err := client.ListUsers(context.Background(), top, skip)
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			a.printUsers(users)
+			return nil
+		},
+	}
+	listCmd.Flags().Int("top", 42, "maximum number of users to return")
+	listCmd.Flags().Int("skip", 0, "number of users to skip")
+	cmd.AddCommand(listCmd)
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "find <query>",
+		Short: "Find a single YouTrack user",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			user, err := client.ResolveUser(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				content, err := json.Marshal(user)
+				if err != nil {
+					return fmt.Errorf("encode user: %w", err)
+				}
+				fmt.Fprintf(a.out, "%s\n", content)
+				return nil
+			}
+			a.printUser(user)
+			return nil
+		},
+	})
+	return cmd
+}
+
+func (a *app) newYouTrackClient(fields ...string) (*youtrack.Client, error) {
+	cfg, err := config.LoadEffective(a.paths)
+	if err != nil {
+		return nil, err
+	}
+	if err := config.Require(cfg, fields...); err != nil {
+		return nil, err
+	}
+	return youtrack.NewClient(cfg.URL, cfg.Token), nil
+}
+
 func (a *app) printConfig(cfg config.Config) {
 	fmt.Fprintf(a.out, "url: %s\n", cfg.URL)
 	fmt.Fprintf(a.out, "token: %s\n", config.MaskToken(cfg.Token))
 	fmt.Fprintf(a.out, "project_id: %s\n", cfg.ProjectID)
+}
+
+func (a *app) printUser(user youtrack.User) {
+	fmt.Fprintf(a.out, "id: %s\n", user.ID)
+	fmt.Fprintf(a.out, "login: %s\n", user.Login)
+	fmt.Fprintf(a.out, "name: %s\n", userDisplayName(user))
+	if user.Email != "" {
+		fmt.Fprintf(a.out, "email: %s\n", user.Email)
+	}
+	if user.Banned {
+		fmt.Fprintln(a.out, "status: banned")
+	}
+}
+
+func (a *app) printUsers(users []youtrack.User) {
+	w := tabwriter.NewWriter(a.out, 0, 0, 2, ' ', 0)
+	for _, user := range users {
+		status := ""
+		if user.Banned {
+			status = "banned"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", user.ID, user.Login, userDisplayName(user), status)
+	}
+	_ = w.Flush()
+}
+
+func userDisplayName(user youtrack.User) string {
+	if user.FullName != "" {
+		return user.FullName
+	}
+	return user.Name
 }
 
 func setField(cfg *config.Config, field, value string) {

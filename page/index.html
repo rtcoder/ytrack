@@ -350,7 +350,8 @@
           <h1>ytrack</h1>
           <p class="lead">
             A cross-platform CLI for creating YouTrack issues, moving their status,
-            and keeping global credentials separate from per-project configuration.
+            inspecting users, and keeping global credentials separate from per-project
+            configuration.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/rtcoder/ytrack/releases">Download</a>
@@ -370,7 +371,8 @@ ytrack global set-token perm:your-token
 ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce"
-ytrack issue status ART-123 Done</code></pre>
+ytrack issue status ART-123 Done
+ytrack user me</code></pre>
         </div>
       </section>
 
@@ -437,7 +439,8 @@ ytrack global set-token perm:your-token
 ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce..."
-ytrack issue status ART-123 Done</code></pre>
+ytrack issue status ART-123 Done
+ytrack user list --top 20</code></pre>
             </div>
           </div>
         </div>
@@ -498,6 +501,19 @@ ytrack unset-project-id</code></pre>
               <pre><code>ytrack issue create &lt;summary&gt;
 ytrack issue create &lt;summary&gt; &lt;description&gt;
 ytrack issue status &lt;issue-id&gt; &lt;status&gt;</code></pre>
+            </article>
+
+            <article class="card">
+              <div>
+                <span class="pill">Users</span>
+                <h3>Inspect and Find</h3>
+                <p>Show the current user, list users, and resolve a single user by query.</p>
+              </div>
+              <pre><code>ytrack user me
+ytrack user list
+ytrack user list --top &lt;count&gt;
+ytrack user list --skip &lt;count&gt;
+ytrack user find &lt;query&gt;</code></pre>
             </article>
           </div>
 
@@ -565,7 +581,9 @@ project_id: 0-1</code></pre>
             </div>
             <pre><code>ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
-ytrack --json issue status ART-123 Done</code></pre>
+ytrack --json issue status ART-123 Done
+ytrack --json user me
+ytrack --json user list --top 20</code></pre>
           </div>
         </div>
       </section>
@@ -584,6 +602,13 @@ ytrack --json issue status ART-123 Done</code></pre>
             </article>
             <article class="card">
               <h3><code>issue status</code></h3>
+              <ul>
+                <li><code>url</code></li>
+                <li><code>token</code></li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3><code>user</code></h3>
               <ul>
                 <li><code>url</code></li>
                 <li><code>token</code></li>
