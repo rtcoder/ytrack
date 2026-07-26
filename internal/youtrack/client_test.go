@@ -313,6 +313,97 @@ func TestCreateProjectUsesTemplateQueryParameter(t *testing.T) {
 	}
 }
 
+func TestListProjectIssuesRequestsProjectIssues(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"}],"$type":"Issue"}]`))
+	}))
+	defer server.Close()
+
+	issues, raw, err := NewClient(server.URL, "perm:token").ListProjectIssues(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectIssues() error = %v", err)
+	}
+
+	wantPath := "/api/admin/projects/0-3/issues?fields=id,idReadable,summary,customFields(name,value(name,login))"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if len(issues) != 1 || issues[0].IDReadable != "YR-14" || issues[0].Summary != "Add init" || string(raw) == "" {
+		t.Fatalf("ListProjectIssues() issues=%+v raw=%q, want parsed issues and raw JSON", issues, string(raw))
+	}
+}
+
+func TestListProjectUsersRequestsProjectTeamUsers(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`[{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","banned":false,"$type":"User"}]`))
+	}))
+	defer server.Close()
+
+	users, raw, err := NewClient(server.URL, "perm:token").ListProjectUsers(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectUsers() error = %v", err)
+	}
+
+	wantPath := "/api/admin/projects/0-3/team/users?fields=id,login,name,fullName,email,banned"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if len(users) != 1 || users[0].Login != "rtcoder" || string(raw) == "" {
+		t.Fatalf("ListProjectUsers() users=%+v raw=%q, want parsed users and raw JSON", users, string(raw))
+	}
+}
+
+func TestListProjectBundleValuesFiltersCustomFieldBundles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))" {
+			t.Fatalf("path = %q, want project custom fields", r.URL.RequestURI())
+		}
+		_, _ = w.Write([]byte(`[
+			{"id":"186-13","field":{"name":"State","$type":"CustomField"},"bundle":{"values":[{"id":"162-0","name":"Submitted","$type":"StateBundleElement"},{"id":"162-7","name":"Fixed","$type":"StateBundleElement"}],"$type":"StateBundle"},"$type":"StateProjectCustomField"},
+			{"id":"186-12","field":{"name":"Type","$type":"CustomField"},"bundle":{"values":[{"id":"160-5","name":"Bug","$type":"EnumBundleElement"}],"$type":"EnumBundle"},"$type":"EnumProjectCustomField"},
+			{"id":"186-11","field":{"name":"Priority","$type":"CustomField"},"bundle":{"values":[{"id":"160-3","name":"Normal","$type":"EnumBundleElement"}],"$type":"EnumBundle"},"$type":"EnumProjectCustomField"},
+			{"id":"186-15","field":{"name":"Fix versions","$type":"CustomField"},"bundle":{"values":[{"id":"170-1","name":"v0.1.7","$type":"VersionBundleElement"}],"$type":"VersionBundle"},"$type":"VersionProjectCustomField"},
+			{"id":"186-16","field":{"name":"Affected versions","$type":"CustomField"},"bundle":{"values":[{"id":"170-2","name":"v0.1.6","$type":"VersionBundleElement"}],"$type":"VersionBundle"},"$type":"VersionProjectCustomField"}
+		]`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "perm:token")
+	statuses, rawStatuses, err := client.ListProjectStatuses(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectStatuses() error = %v", err)
+	}
+	types, _, err := client.ListProjectTypes(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectTypes() error = %v", err)
+	}
+	priorities, _, err := client.ListProjectPriorities(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectPriorities() error = %v", err)
+	}
+	versions, _, err := client.ListProjectVersions(context.Background(), "0-3")
+	if err != nil {
+		t.Fatalf("ListProjectVersions() error = %v", err)
+	}
+
+	if len(statuses) != 2 || statuses[1].Name != "Fixed" || string(rawStatuses) == "" {
+		t.Fatalf("statuses=%+v raw=%q, want State bundle values", statuses, string(rawStatuses))
+	}
+	if len(types) != 1 || types[0].Name != "Bug" {
+		t.Fatalf("types=%+v, want Type bundle values", types)
+	}
+	if len(priorities) != 1 || priorities[0].Name != "Normal" {
+		t.Fatalf("priorities=%+v, want Priority bundle values", priorities)
+	}
+	if len(versions) != 2 || versions[0].Name != "v0.1.7" || versions[1].Name != "v0.1.6" {
+		t.Fatalf("versions=%+v, want Fix and Affected version values", versions)
+	}
+}
+
 func TestClientReturnsHTTPErrorBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad token", http.StatusUnauthorized)

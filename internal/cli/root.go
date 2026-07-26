@@ -455,7 +455,92 @@ func (a *app) newProjectCommand() *cobra.Command {
 	createCmd.Flags().String("template", "", "project template: scrum or kanban")
 	createCmd.Flags().Bool("set-project-id", false, "save the created project ID as the local project_id")
 	cmd.AddCommand(createCmd)
+	cmd.AddCommand(a.newProjectListCommand())
 
+	return cmd
+}
+
+func (a *app) newProjectListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list issues|statuses|users|types|priorities|versions",
+		Short: "List project issues and project metadata",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.LoadEffective(a.paths)
+			if err != nil {
+				return err
+			}
+			if err := config.Require(cfg, "url", "token", "project_id"); err != nil {
+				return err
+			}
+			client := youtrack.NewClient(cfg.URL, cfg.Token)
+			switch args[0] {
+			case "issues":
+				issues, raw, err := client.ListProjectIssues(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printProjectIssues(issues)
+			case "users":
+				users, raw, err := client.ListProjectUsers(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printUsers(users)
+			case "statuses":
+				values, raw, err := client.ListProjectStatuses(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printNamedValues(values)
+			case "types":
+				values, raw, err := client.ListProjectTypes(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printNamedValues(values)
+			case "priorities":
+				values, raw, err := client.ListProjectPriorities(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printNamedValues(values)
+			case "versions":
+				values, raw, err := client.ListProjectVersions(context.Background(), cfg.ProjectID)
+				if err != nil {
+					return err
+				}
+				if a.jsonOutput {
+					fmt.Fprintf(a.out, "%s\n", raw)
+					return nil
+				}
+				a.printNamedValues(values)
+			default:
+				return fmt.Errorf("unknown project list resource %q", args[0])
+			}
+			return nil
+		},
+	}
 	return cmd
 }
 
@@ -544,11 +629,59 @@ func (a *app) printUsers(users []youtrack.User) {
 	_ = w.Flush()
 }
 
+func (a *app) printProjectIssues(issues []youtrack.ProjectIssue) {
+	w := tabwriter.NewWriter(a.out, 0, 0, 2, ' ', 0)
+	for _, issue := range issues {
+		fmt.Fprintf(w, "%s\t%s\t%s\n", issue.IDReadable, issueFieldValue(issue, "State"), issue.Summary)
+	}
+	_ = w.Flush()
+}
+
+func (a *app) printNamedValues(values []youtrack.NamedValue) {
+	w := tabwriter.NewWriter(a.out, 0, 0, 2, ' ', 0)
+	for _, value := range values {
+		fmt.Fprintf(w, "%s\t%s\n", value.ID, value.Name)
+	}
+	_ = w.Flush()
+}
+
 func userDisplayName(user youtrack.User) string {
 	if user.FullName != "" {
 		return user.FullName
 	}
 	return user.Name
+}
+
+func issueFieldValue(issue youtrack.ProjectIssue, name string) string {
+	for _, field := range issue.CustomFields {
+		if field.Name != name {
+			continue
+		}
+		switch value := field.Value.(type) {
+		case map[string]any:
+			if name, ok := value["name"].(string); ok {
+				return name
+			}
+			if login, ok := value["login"].(string); ok {
+				return login
+			}
+		case []any:
+			var parts []string
+			for _, item := range value {
+				itemMap, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				if name, ok := itemMap["name"].(string); ok {
+					parts = append(parts, name)
+				}
+			}
+			return strings.Join(parts, ",")
+		case string:
+			return value
+		}
+	}
+	return ""
 }
 
 func setField(cfg *config.Config, field, value string) {

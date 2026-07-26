@@ -24,6 +24,18 @@ type Issue struct {
 	Summary    string `json:"summary"`
 }
 
+type IssueCustomField struct {
+	Name  string `json:"name"`
+	Value any    `json:"value"`
+}
+
+type ProjectIssue struct {
+	ID           string             `json:"id"`
+	IDReadable   string             `json:"idReadable"`
+	Summary      string             `json:"summary"`
+	CustomFields []IssueCustomField `json:"customFields"`
+}
+
 type CommandResult struct {
 	Issues   []Issue         `json:"issues"`
 	Commands json.RawMessage `json:"commands"`
@@ -44,6 +56,21 @@ type Project struct {
 	ShortName string `json:"shortName"`
 	Name      string `json:"name"`
 	Leader    User   `json:"leader"`
+}
+
+type NamedValue struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ProjectCustomField struct {
+	ID    string `json:"id"`
+	Field struct {
+		Name string `json:"name"`
+	} `json:"field"`
+	Bundle struct {
+		Values []NamedValue `json:"values"`
+	} `json:"bundle"`
 }
 
 func NewClient(baseURL, token string) *Client {
@@ -196,6 +223,84 @@ func (c *Client) CreateProject(ctx context.Context, name, shortName, leaderID, t
 		return Project{}, raw, fmt.Errorf("parse create project response: %w", err)
 	}
 	return project, raw, nil
+}
+
+func (c *Client) ListProjectIssues(ctx context.Context, projectID string) ([]ProjectIssue, []byte, error) {
+	var issues []ProjectIssue
+	path := "/api/admin/projects/" + url.PathEscape(projectID) + "/issues?fields=id,idReadable,summary,customFields(name,value(name,login))"
+	raw, err := c.doNoBody(ctx, http.MethodGet, path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal(raw, &issues); err != nil {
+		return nil, raw, fmt.Errorf("parse project issues response: %w", err)
+	}
+	return issues, raw, nil
+}
+
+func (c *Client) ListProjectUsers(ctx context.Context, projectID string) ([]User, []byte, error) {
+	var users []User
+	path := "/api/admin/projects/" + url.PathEscape(projectID) + "/team/users?fields=id,login,name,fullName,email,banned"
+	raw, err := c.doNoBody(ctx, http.MethodGet, path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal(raw, &users); err != nil {
+		return nil, raw, fmt.Errorf("parse project users response: %w", err)
+	}
+	return users, raw, nil
+}
+
+func (c *Client) ListProjectStatuses(ctx context.Context, projectID string) ([]NamedValue, []byte, error) {
+	return c.listProjectFieldValues(ctx, projectID, "State")
+}
+
+func (c *Client) ListProjectTypes(ctx context.Context, projectID string) ([]NamedValue, []byte, error) {
+	return c.listProjectFieldValues(ctx, projectID, "Type")
+}
+
+func (c *Client) ListProjectPriorities(ctx context.Context, projectID string) ([]NamedValue, []byte, error) {
+	return c.listProjectFieldValues(ctx, projectID, "Priority")
+}
+
+func (c *Client) ListProjectVersions(ctx context.Context, projectID string) ([]NamedValue, []byte, error) {
+	fields, raw, err := c.listProjectCustomFields(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var values []NamedValue
+	for _, field := range fields {
+		if field.Field.Name == "Fix versions" || field.Field.Name == "Affected versions" {
+			values = append(values, field.Bundle.Values...)
+		}
+	}
+	return values, raw, nil
+}
+
+func (c *Client) listProjectFieldValues(ctx context.Context, projectID, fieldName string) ([]NamedValue, []byte, error) {
+	fields, raw, err := c.listProjectCustomFields(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, field := range fields {
+		if field.Field.Name == fieldName {
+			return field.Bundle.Values, raw, nil
+		}
+	}
+	return nil, raw, nil
+}
+
+func (c *Client) listProjectCustomFields(ctx context.Context, projectID string) ([]ProjectCustomField, []byte, error) {
+	var fields []ProjectCustomField
+	path := "/api/admin/projects/" + url.PathEscape(projectID) + "/customFields?fields=id,field(name),bundle(values(id,name))"
+	raw, err := c.doNoBody(ctx, http.MethodGet, path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, raw, fmt.Errorf("parse project custom fields response: %w", err)
+	}
+	return fields, raw, nil
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, payload any) ([]byte, error) {

@@ -376,6 +376,125 @@ func TestProjectCreateJSONWithSetProjectIDSavesLocalProjectAndPrintsOnlyRawRespo
 	}
 }
 
+func TestProjectListCommandsPrintProjectResources(t *testing.T) {
+	tests := []struct {
+		name       string
+		resource   string
+		response   string
+		wantPath   string
+		wantOutput []string
+	}{
+		{
+			name:     "issues",
+			resource: "issues",
+			response: `[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"}],"$type":"Issue"}]`,
+			wantPath: "/api/admin/projects/0-3/issues?fields=id,idReadable,summary,customFields(name,value(name,login))",
+			wantOutput: []string{
+				"YR-14",
+				"Submitted",
+				"Add init",
+			},
+		},
+		{
+			name:     "users",
+			resource: "users",
+			response: `[{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","banned":false,"$type":"User"}]`,
+			wantPath: "/api/admin/projects/0-3/team/users?fields=id,login,name,fullName,email,banned",
+			wantOutput: []string{
+				"1-2",
+				"rtcoder",
+				"Robert",
+			},
+		},
+		{
+			name:     "statuses",
+			resource: "statuses",
+			response: projectCustomFieldsResponse(),
+			wantPath: "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))",
+			wantOutput: []string{
+				"162-0",
+				"Submitted",
+				"162-7",
+				"Fixed",
+			},
+		},
+		{
+			name:     "types",
+			resource: "types",
+			response: projectCustomFieldsResponse(),
+			wantPath: "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))",
+			wantOutput: []string{
+				"160-5",
+				"Bug",
+			},
+		},
+		{
+			name:     "priorities",
+			resource: "priorities",
+			response: projectCustomFieldsResponse(),
+			wantPath: "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))",
+			wantOutput: []string{
+				"160-3",
+				"Normal",
+			},
+		},
+		{
+			name:     "versions",
+			resource: "versions",
+			response: projectCustomFieldsResponse(),
+			wantPath: "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))",
+			wantOutput: []string{
+				"170-1",
+				"v0.1.7",
+				"170-2",
+				"v0.1.6",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPath string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.RequestURI()
+				_, _ = w.Write([]byte(tt.response))
+			}))
+			defer server.Close()
+
+			paths := configuredPaths(t, server.URL)
+			runCLI(t, paths, "set-project-id", "0-3")
+
+			out := runCLI(t, paths, "project", "list", tt.resource)
+
+			if gotPath != tt.wantPath {
+				t.Fatalf("path = %q, want %q", gotPath, tt.wantPath)
+			}
+			for _, want := range tt.wantOutput {
+				if !strings.Contains(out, want) {
+					t.Fatalf("project list %s output = %q, want %q", tt.resource, out, want)
+				}
+			}
+		})
+	}
+}
+
+func TestProjectListJSONPrintsRawResponse(t *testing.T) {
+	raw := `[{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","banned":false,"$type":"User"}]`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(raw))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-3")
+
+	out := runCLI(t, paths, "--json", "project", "list", "users")
+
+	if strings.TrimSpace(out) != raw {
+		t.Fatalf("project list json output = %q, want raw JSON", out)
+	}
+}
+
 func newProjectCreateServer(t *testing.T, projectID string) *httptest.Server {
 	t.Helper()
 
@@ -389,6 +508,16 @@ func newProjectCreateServer(t *testing.T, projectID string) *httptest.Server {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 	}))
+}
+
+func projectCustomFieldsResponse() string {
+	return `[
+		{"id":"186-13","field":{"name":"State","$type":"CustomField"},"bundle":{"values":[{"id":"162-0","name":"Submitted","$type":"StateBundleElement"},{"id":"162-7","name":"Fixed","$type":"StateBundleElement"}],"$type":"StateBundle"},"$type":"StateProjectCustomField"},
+		{"id":"186-12","field":{"name":"Type","$type":"CustomField"},"bundle":{"values":[{"id":"160-5","name":"Bug","$type":"EnumBundleElement"}],"$type":"EnumBundle"},"$type":"EnumProjectCustomField"},
+		{"id":"186-11","field":{"name":"Priority","$type":"CustomField"},"bundle":{"values":[{"id":"160-3","name":"Normal","$type":"EnumBundleElement"}],"$type":"EnumBundle"},"$type":"EnumProjectCustomField"},
+		{"id":"186-15","field":{"name":"Fix versions","$type":"CustomField"},"bundle":{"values":[{"id":"170-1","name":"v0.1.7","$type":"VersionBundleElement"}],"$type":"VersionBundle"},"$type":"VersionProjectCustomField"},
+		{"id":"186-16","field":{"name":"Affected versions","$type":"CustomField"},"bundle":{"values":[{"id":"170-2","name":"v0.1.6","$type":"VersionBundleElement"}],"$type":"VersionBundle"},"$type":"VersionProjectCustomField"}
+	]`
 }
 
 func configuredPaths(t *testing.T, serverURL string) config.Paths {

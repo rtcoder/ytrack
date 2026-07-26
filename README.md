@@ -318,6 +318,12 @@ ytrack project create [title] --key <project-key> --leader <user>
 ytrack project create [title] --key <project-key> --leader <user> --set-project-id
 ytrack project create [title] --key <project-key> --leader <user> --template kanban
 ytrack project create [title] --key <project-key> --leader <user> --template scrum
+ytrack project list issues
+ytrack project list statuses
+ytrack project list users
+ytrack project list types
+ytrack project list priorities
+ytrack project list versions
 ```
 
 Create a project with command-line arguments:
@@ -357,6 +363,17 @@ before overwriting it:
 Local project_id is 0-1. Overwrite with 0-16? [y/N]
 ```
 
+List data for the configured local project:
+
+```sh
+ytrack project list issues
+ytrack project list statuses
+ytrack project list users
+ytrack project list types
+ytrack project list priorities
+ytrack project list versions
+```
+
 ### JSON Output
 
 Use `--json` before the command:
@@ -368,6 +385,7 @@ ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20
 ytrack --json project create "Mobile App" --key MOB --leader me
+ytrack --json project list users
 ```
 
 Without `--json`, successful commands print human-readable output:
