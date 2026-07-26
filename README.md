@@ -190,6 +190,8 @@ project_id: 0-1
 
 ## Command Reference
 
+Generated command reference is available in [`docs/commands.md`](docs/commands.md).
+
 ### Global Options
 
 ```sh
