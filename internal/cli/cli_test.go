@@ -74,6 +74,23 @@ func TestInitPromptsAndWritesLocalProjectConfig(t *testing.T) {
 	}
 }
 
+func TestCompletionCommandsGenerateShellCompletions(t *testing.T) {
+	paths := config.Paths{
+		Global: filepath.Join(t.TempDir(), "global", "config.json"),
+		Local:  filepath.Join(t.TempDir(), "project", ".ytrack", "config.json"),
+	}
+
+	bash := runCLI(t, paths, "completion", "bash")
+	if !strings.Contains(bash, "__start_ytrack") {
+		t.Fatalf("bash completion output missing __start_ytrack")
+	}
+
+	zsh := runCLI(t, paths, "completion", "zsh")
+	if !strings.Contains(zsh, "#compdef ytrack") {
+		t.Fatalf("zsh completion output missing compdef header")
+	}
+}
+
 func TestIssueCreateJSONUsesEffectiveConfig(t *testing.T) {
 	var gotPayload map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

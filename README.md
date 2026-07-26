@@ -477,6 +477,17 @@ Updated ART-123 to Done
 With `--json`, API-backed commands print the raw YouTrack response. API error
 responses with `error_description` are printed as concise actionable messages.
 
+### Shell Completion
+
+Generate shell completion scripts with:
+
+```sh
+ytrack completion bash
+ytrack completion zsh
+ytrack completion fish
+ytrack completion powershell
+```
+
 ## Required Configuration
 
 `issue create` requires:
