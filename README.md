@@ -326,6 +326,10 @@ ytrack project create [title] --key <project-key> --leader <user> --set-project-
 ytrack project create [title] --key <project-key> --leader <user> --template kanban
 ytrack project create [title] --key <project-key> --leader <user> --template scrum
 ytrack project list issues
+ytrack project list issues --status <value>
+ytrack project list issues --user <value>
+ytrack project list issues --type <value>
+ytrack project list issues --priority <value>
 ytrack project list statuses
 ytrack project list users
 ytrack project list types
@@ -374,6 +378,10 @@ List data for the configured local project:
 
 ```sh
 ytrack project list issues
+ytrack project list issues --status Submitted
+ytrack project list issues --user me
+ytrack project list issues --type Bug
+ytrack project list issues --priority Normal
 ytrack project list statuses
 ytrack project list users
 ytrack project list types

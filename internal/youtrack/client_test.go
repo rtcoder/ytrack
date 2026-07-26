@@ -335,6 +335,42 @@ func TestListProjectIssuesRequestsProjectIssues(t *testing.T) {
 	}
 }
 
+func TestListProjectIssuesWithFiltersSearchesByProjectShortName(t *testing.T) {
+	var requested []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.RequestURI())
+		switch r.URL.Path {
+		case "/api/admin/projects/0-3":
+			_, _ = w.Write([]byte(`{"id":"0-3","shortName":"YR","name":"ytrack","$type":"Project"}`))
+		case "/api/issues":
+			_, _ = w.Write([]byte(`[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[],"$type":"Issue"}]`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	filters := IssueFilters{
+		Status:   "Submitted",
+		User:     "me",
+		Type:     "Bug",
+		Priority: "Normal",
+	}
+	issues, raw, err := NewClient(server.URL, "perm:token").ListProjectIssuesFiltered(context.Background(), "0-3", filters)
+	if err != nil {
+		t.Fatalf("ListProjectIssuesFiltered() error = %v", err)
+	}
+
+	wantProjectPath := "/api/admin/projects/0-3?fields=id,shortName,name"
+	wantIssuesPath := "/api/issues?fields=id%2CidReadable%2Csummary%2CcustomFields%28name%2Cvalue%28name%2Clogin%29%29&query=project%3A+YR+State%3A+%7BSubmitted%7D+Assignee%3A+%7Bme%7D+Type%3A+%7BBug%7D+Priority%3A+%7BNormal%7D"
+	if len(requested) != 2 || requested[0] != wantProjectPath || requested[1] != wantIssuesPath {
+		t.Fatalf("requested = %#v, want project lookup then filtered issues", requested)
+	}
+	if len(issues) != 1 || issues[0].IDReadable != "YR-14" || string(raw) == "" {
+		t.Fatalf("ListProjectIssuesFiltered() issues=%+v raw=%q, want parsed issues and raw JSON", issues, string(raw))
+	}
+}
+
 func TestListProjectUsersRequestsProjectTeamUsers(t *testing.T) {
 	var gotPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -37,6 +37,13 @@ type ProjectIssue struct {
 	CustomFields []IssueCustomField `json:"customFields"`
 }
 
+type IssueFilters struct {
+	Status   string
+	User     string
+	Type     string
+	Priority string
+}
+
 type CommandResult struct {
 	Issues   []Issue         `json:"issues"`
 	Commands json.RawMessage `json:"commands"`
@@ -252,6 +259,45 @@ func (c *Client) ListProjectIssues(ctx context.Context, projectID string) ([]Pro
 	return issues, raw, nil
 }
 
+func (c *Client) ListProjectIssuesFiltered(ctx context.Context, projectID string, filters IssueFilters) ([]ProjectIssue, []byte, error) {
+	if filters == (IssueFilters{}) {
+		return c.ListProjectIssues(ctx, projectID)
+	}
+
+	project, _, err := c.GetProject(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	query := buildIssueQuery(project.ShortName, filters)
+	values := url.Values{}
+	values.Set("fields", "id,idReadable,summary,customFields(name,value(name,login))")
+	values.Set("query", query)
+
+	var issues []ProjectIssue
+	raw, err := c.doNoBody(ctx, http.MethodGet, "/api/issues?"+values.Encode())
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal(raw, &issues); err != nil {
+		return nil, raw, fmt.Errorf("parse filtered issues response: %w", err)
+	}
+	return issues, raw, nil
+}
+
+func (c *Client) GetProject(ctx context.Context, projectID string) (Project, []byte, error) {
+	var project Project
+	path := "/api/admin/projects/" + url.PathEscape(projectID) + "?fields=id,shortName,name"
+	raw, err := c.doNoBody(ctx, http.MethodGet, path)
+	if err != nil {
+		return Project{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &project); err != nil {
+		return Project{}, raw, fmt.Errorf("parse project response: %w", err)
+	}
+	return project, raw, nil
+}
+
 func (c *Client) ListProjectUsers(ctx context.Context, projectID string) ([]User, []byte, error) {
 	var users []User
 	path := "/api/admin/projects/" + url.PathEscape(projectID) + "/team/users?fields=id,login,name,fullName,email,banned"
@@ -388,4 +434,21 @@ func displayUserName(user User) string {
 		return user.FullName
 	}
 	return user.Name
+}
+
+func buildIssueQuery(projectShortName string, filters IssueFilters) string {
+	parts := []string{"project: " + projectShortName}
+	if filters.Status != "" {
+		parts = append(parts, "State: {"+filters.Status+"}")
+	}
+	if filters.User != "" {
+		parts = append(parts, "Assignee: {"+filters.User+"}")
+	}
+	if filters.Type != "" {
+		parts = append(parts, "Type: {"+filters.Type+"}")
+	}
+	if filters.Priority != "" {
+		parts = append(parts, "Priority: {"+filters.Priority+"}")
+	}
+	return strings.Join(parts, " ")
 }

@@ -538,6 +538,35 @@ func TestProjectListJSONPrintsRawResponse(t *testing.T) {
 	}
 }
 
+func TestProjectListIssuesWithFiltersSearchesIssues(t *testing.T) {
+	var requested []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.RequestURI())
+		switch r.URL.Path {
+		case "/api/admin/projects/0-3":
+			_, _ = w.Write([]byte(`{"id":"0-3","shortName":"YR","name":"ytrack","$type":"Project"}`))
+		case "/api/issues":
+			_, _ = w.Write([]byte(`[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"}],"$type":"Issue"}]`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-3")
+
+	out := runCLI(t, paths, "project", "list", "issues", "--status", "Submitted", "--user", "me", "--type", "Bug", "--priority", "Normal")
+
+	wantIssuesPath := "/api/issues?fields=id%2CidReadable%2Csummary%2CcustomFields%28name%2Cvalue%28name%2Clogin%29%29&query=project%3A+YR+State%3A+%7BSubmitted%7D+Assignee%3A+%7Bme%7D+Type%3A+%7BBug%7D+Priority%3A+%7BNormal%7D"
+	if len(requested) != 2 || requested[1] != wantIssuesPath {
+		t.Fatalf("requested = %#v, want filtered issue search", requested)
+	}
+	if !strings.Contains(out, "YR-14") || !strings.Contains(out, "Submitted") || !strings.Contains(out, "Add init") {
+		t.Fatalf("project list issues output = %q, want filtered issue row", out)
+	}
+}
+
 func newProjectCreateServer(t *testing.T, projectID string) *httptest.Server {
 	t.Helper()
 

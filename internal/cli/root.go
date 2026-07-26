@@ -500,7 +500,11 @@ func (a *app) newProjectListCommand() *cobra.Command {
 			client := youtrack.NewClient(cfg.URL, cfg.Token)
 			switch args[0] {
 			case "issues":
-				issues, raw, err := client.ListProjectIssues(context.Background(), cfg.ProjectID)
+				filters, err := issueFiltersFromFlags(cmd)
+				if err != nil {
+					return err
+				}
+				issues, raw, err := client.ListProjectIssuesFiltered(context.Background(), cfg.ProjectID, filters)
 				if err != nil {
 					return err
 				}
@@ -565,6 +569,10 @@ func (a *app) newProjectListCommand() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().String("status", "", "filter issues by status")
+	cmd.Flags().String("user", "", "filter issues by assignee")
+	cmd.Flags().String("type", "", "filter issues by type")
+	cmd.Flags().String("priority", "", "filter issues by priority")
 	return cmd
 }
 
@@ -718,6 +726,31 @@ func issueFieldValue(issue youtrack.ProjectIssue, name string) string {
 		}
 	}
 	return ""
+}
+
+func issueFiltersFromFlags(cmd *cobra.Command) (youtrack.IssueFilters, error) {
+	status, err := cmd.Flags().GetString("status")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	user, err := cmd.Flags().GetString("user")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	issueType, err := cmd.Flags().GetString("type")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	priority, err := cmd.Flags().GetString("priority")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	return youtrack.IssueFilters{
+		Status:   status,
+		User:     user,
+		Type:     issueType,
+		Priority: priority,
+	}, nil
 }
 
 func setField(cfg *config.Config, field, value string) {
