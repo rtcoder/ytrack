@@ -190,3 +190,10 @@ The release workflow builds:
 - `windows/amd64`
 
 Each release includes compressed packages plus `checksums.txt`.
+
+## GitHub Pages
+
+The project website lives in `page/index.html` and is deployed by the `Pages`
+workflow on pushes to `main` that change `page/**` or the workflow file.
+
+In repository settings, set GitHub Pages to deploy from GitHub Actions.
