@@ -70,6 +70,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 	root.AddCommand(a.newLocalUnsetCommand("unset-url", "Unset local YouTrack URL", "url"))
 	root.AddCommand(a.newLocalUnsetCommand("unset-token", "Unset local YouTrack token", "token"))
 	root.AddCommand(a.newLocalUnsetCommand("unset-project-id", "Unset local YouTrack project ID", "project_id"))
+	root.AddCommand(a.newInitCommand())
 	root.AddCommand(a.newShowCommand())
 	root.AddCommand(a.newIssueCommand())
 	root.AddCommand(a.newUserCommand())
@@ -195,6 +196,40 @@ func (a *app) newShowCommand() *cobra.Command {
 				return err
 			}
 			a.printConfig(cfg)
+			return nil
+		},
+	}
+}
+
+func (a *app) newInitCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init",
+		Short: "Interactively configure ytrack for the current directory",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reader := bufio.NewReader(a.in)
+			url, err := a.prompt(reader, "Set YouTrack URL:")
+			if err != nil {
+				return err
+			}
+			token, err := a.prompt(reader, "Set YouTrack token:")
+			if err != nil {
+				return err
+			}
+			projectID, err := a.prompt(reader, "Set project ID:")
+			if err != nil {
+				return err
+			}
+			cfg := config.Config{
+				URL:       url,
+				Token:     token,
+				ProjectID: projectID,
+			}
+			if err := config.Save(a.paths.Local, cfg); err != nil {
+				return err
+			}
+			fmt.Fprintln(a.out, "Saved local project config")
+			fmt.Fprintln(a.out, "Add .ytrack/ to .gitignore")
 			return nil
 		},
 	}

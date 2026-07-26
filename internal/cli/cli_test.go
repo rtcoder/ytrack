@@ -42,6 +42,38 @@ func TestConfigCommandsWriteAndShowMaskedEffectiveConfig(t *testing.T) {
 	}
 }
 
+func TestInitPromptsAndWritesLocalProjectConfig(t *testing.T) {
+	temp := t.TempDir()
+	paths := config.Paths{
+		Global: filepath.Join(temp, "global", "config.json"),
+		Local:  filepath.Join(temp, "project", ".ytrack", "config.json"),
+	}
+
+	out := runCLIWithInput(t, paths, "https://youtrack.example.com\nperm:secret\n0-3\n", "init")
+
+	for _, want := range []string{
+		"Set YouTrack URL:",
+		"Set YouTrack token:",
+		"Set project ID:",
+		"Saved local project config",
+		"Add .ytrack/ to .gitignore",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("init output = %q, want %q", out, want)
+		}
+	}
+	if strings.Contains(out, "perm:secret") {
+		t.Fatalf("init output leaked token: %q", out)
+	}
+	cfg, err := config.Load(paths.Local)
+	if err != nil {
+		t.Fatalf("load local config: %v", err)
+	}
+	if cfg.URL != "https://youtrack.example.com" || cfg.Token != "perm:secret" || cfg.ProjectID != "0-3" {
+		t.Fatalf("local config = %+v, want prompted values", cfg)
+	}
+}
+
 func TestIssueCreateJSONUsesEffectiveConfig(t *testing.T) {
 	var gotPayload map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

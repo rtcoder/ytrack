@@ -99,6 +99,12 @@ Inside a repository, set the YouTrack project ID:
 ytrack set-project-id 0-1
 ```
 
+Or run the interactive local setup:
+
+```sh
+ytrack init
+```
+
 Create an issue:
 
 ```sh
@@ -222,6 +228,7 @@ There is no `ytrack global set-project-id`. Project IDs are intentionally local.
 
 ```sh
 ytrack show
+ytrack init
 ytrack set-url <url>
 ytrack set-token <token>
 ytrack set-project-id <project-id>
