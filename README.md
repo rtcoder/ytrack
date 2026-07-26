@@ -544,6 +544,12 @@ Run tests:
 go test ./...
 ```
 
+Pull requests run:
+
+```sh
+go test -count=1 ./...
+```
+
 Build the CLI:
 
 ```sh
