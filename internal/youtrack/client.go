@@ -44,6 +44,13 @@ type IssueFilters struct {
 	Priority string
 }
 
+type IssueUpdate struct {
+	Summary     string
+	Description string
+	Type        string
+	Priority    string
+}
+
 type CommandResult struct {
 	Issues   []Issue         `json:"issues"`
 	Commands json.RawMessage `json:"commands"`
@@ -137,6 +144,38 @@ func (c *Client) GetIssue(ctx context.Context, issueID string) (ProjectIssue, []
 	}
 	if err := json.Unmarshal(raw, &issue); err != nil {
 		return ProjectIssue{}, raw, fmt.Errorf("parse issue response: %w", err)
+	}
+	return issue, raw, nil
+}
+
+func (c *Client) UpdateIssue(ctx context.Context, issueID string, update IssueUpdate) (ProjectIssue, []byte, error) {
+	payload := map[string]any{}
+	if update.Summary != "" {
+		payload["summary"] = update.Summary
+	}
+	if update.Description != "" {
+		payload["description"] = update.Description
+	}
+
+	var customFields []map[string]any
+	if update.Type != "" {
+		customFields = append(customFields, enumIssueCustomField("Type", update.Type))
+	}
+	if update.Priority != "" {
+		customFields = append(customFields, enumIssueCustomField("Priority", update.Priority))
+	}
+	if len(customFields) > 0 {
+		payload["customFields"] = customFields
+	}
+
+	var issue ProjectIssue
+	path := "/api/issues/" + url.PathEscape(issueID) + "?fields=id,idReadable,summary,description,customFields(name,value(name,login))"
+	raw, err := c.doJSON(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return ProjectIssue{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &issue); err != nil {
+		return ProjectIssue{}, raw, fmt.Errorf("parse update issue response: %w", err)
 	}
 	return issue, raw, nil
 }
@@ -451,4 +490,15 @@ func buildIssueQuery(projectShortName string, filters IssueFilters) string {
 		parts = append(parts, "Priority: {"+filters.Priority+"}")
 	}
 	return strings.Join(parts, " ")
+}
+
+func enumIssueCustomField(name, value string) map[string]any {
+	return map[string]any{
+		"name":  name,
+		"$type": "SingleEnumIssueCustomField",
+		"value": map[string]any{
+			"name":  value,
+			"$type": "EnumBundleElement",
+		},
+	}
 }

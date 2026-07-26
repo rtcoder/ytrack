@@ -113,6 +113,98 @@ func TestIssueShowJSONPrintsRawResponse(t *testing.T) {
 	}
 }
 
+func TestIssueTypeUpdatesTypeField(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"Type","value":{"name":"Task","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "type", "YR-14", "Task")
+
+	fields := gotPayload["customFields"].([]any)
+	typeField := fields[0].(map[string]any)
+	typeValue := typeField["value"].(map[string]any)
+	if typeField["name"] != "Type" || typeValue["name"] != "Task" {
+		t.Fatalf("payload = %#v, want Type Task", gotPayload)
+	}
+	if !strings.Contains(out, "Updated YR-14 type to Task") {
+		t.Fatalf("issue type output = %q, want update confirmation", out)
+	}
+}
+
+func TestIssuePriorityUpdatesPriorityField(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"Priority","value":{"name":"High","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "priority", "YR-14", "High")
+
+	fields := gotPayload["customFields"].([]any)
+	priorityField := fields[0].(map[string]any)
+	priorityValue := priorityField["value"].(map[string]any)
+	if priorityField["name"] != "Priority" || priorityValue["name"] != "High" {
+		t.Fatalf("payload = %#v, want Priority High", gotPayload)
+	}
+	if !strings.Contains(out, "Updated YR-14 priority to High") {
+		t.Fatalf("issue priority output = %q, want update confirmation", out)
+	}
+}
+
+func TestIssueEditUpdatesProvidedFields(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"New title","description":"New description","customFields":[{"name":"Type","value":{"name":"Task","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"},{"name":"Priority","value":{"name":"High","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "edit", "YR-14", "-t", "New title", "-d", "New description", "--type", "Task", "--priority", "High")
+
+	if gotPayload["summary"] != "New title" || gotPayload["description"] != "New description" {
+		t.Fatalf("payload = %#v, want title and description", gotPayload)
+	}
+	fields := gotPayload["customFields"].([]any)
+	if len(fields) != 2 {
+		t.Fatalf("customFields = %#v, want Type and Priority", fields)
+	}
+	if !strings.Contains(out, "Updated YR-14") {
+		t.Fatalf("issue edit output = %q, want update confirmation", out)
+	}
+}
+
+func TestIssueEditJSONPrintsRawResponse(t *testing.T) {
+	raw := `{"id":"3-1","idReadable":"YR-14","summary":"New title","description":"New description","customFields":[],"$type":"Issue"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(raw))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "--json", "issue", "edit", "YR-14", "--title", "New title")
+
+	if strings.TrimSpace(out) != raw {
+		t.Fatalf("issue edit json output = %q, want raw JSON", out)
+	}
+}
+
 func TestUserMePrintsCurrentUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))

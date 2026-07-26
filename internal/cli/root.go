@@ -258,6 +258,69 @@ func (a *app) newIssueCommand() *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "type <issue-id> <value>",
+		Short: "Set a YouTrack issue type",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			issue, raw, err := a.updateIssue(args[0], youtrack.IssueUpdate{Type: args[1]})
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s type to %s\n", issue.IDReadable, args[1])
+			return nil
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "priority <issue-id> <value>",
+		Short: "Set a YouTrack issue priority",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			issue, raw, err := a.updateIssue(args[0], youtrack.IssueUpdate{Priority: args[1]})
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s priority to %s\n", issue.IDReadable, args[1])
+			return nil
+		},
+	})
+	editCmd := &cobra.Command{
+		Use:   "edit <issue-id>",
+		Short: "Edit a YouTrack issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			update, err := issueUpdateFromFlags(cmd)
+			if err != nil {
+				return err
+			}
+			if update == (youtrack.IssueUpdate{}) {
+				return fmt.Errorf("missing edit fields")
+			}
+			issue, raw, err := a.updateIssue(args[0], update)
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s\n", issue.IDReadable)
+			return nil
+		},
+	}
+	editCmd.Flags().StringP("title", "t", "", "issue title")
+	editCmd.Flags().StringP("description", "d", "", "issue description")
+	editCmd.Flags().String("type", "", "issue type")
+	editCmd.Flags().String("priority", "", "issue priority")
+	cmd.AddCommand(editCmd)
+	cmd.AddCommand(&cobra.Command{
 		Use:   "status <issue-id> <status>",
 		Short: "Set a YouTrack issue status",
 		Args:  cobra.ExactArgs(2),
@@ -286,6 +349,14 @@ func (a *app) newIssueCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func (a *app) updateIssue(issueID string, update youtrack.IssueUpdate) (youtrack.ProjectIssue, []byte, error) {
+	client, err := a.newYouTrackClient("url", "token")
+	if err != nil {
+		return youtrack.ProjectIssue{}, nil, err
+	}
+	return client.UpdateIssue(context.Background(), issueID, update)
 }
 
 func (a *app) newUserCommand() *cobra.Command {
@@ -750,6 +821,31 @@ func issueFiltersFromFlags(cmd *cobra.Command) (youtrack.IssueFilters, error) {
 		User:     user,
 		Type:     issueType,
 		Priority: priority,
+	}, nil
+}
+
+func issueUpdateFromFlags(cmd *cobra.Command) (youtrack.IssueUpdate, error) {
+	title, err := cmd.Flags().GetString("title")
+	if err != nil {
+		return youtrack.IssueUpdate{}, err
+	}
+	description, err := cmd.Flags().GetString("description")
+	if err != nil {
+		return youtrack.IssueUpdate{}, err
+	}
+	issueType, err := cmd.Flags().GetString("type")
+	if err != nil {
+		return youtrack.IssueUpdate{}, err
+	}
+	priority, err := cmd.Flags().GetString("priority")
+	if err != nil {
+		return youtrack.IssueUpdate{}, err
+	}
+	return youtrack.IssueUpdate{
+		Summary:     title,
+		Description: description,
+		Type:        issueType,
+		Priority:    priority,
 	}, nil
 }
 

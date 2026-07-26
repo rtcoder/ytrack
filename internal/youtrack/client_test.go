@@ -415,6 +415,52 @@ func TestGetIssueRequestsIssueDetails(t *testing.T) {
 	}
 }
 
+func TestUpdateIssuePostsSummaryDescriptionAndCustomFields(t *testing.T) {
+	var gotPath string
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"New title","description":"New description","customFields":[{"name":"Type","value":{"name":"Task","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"},{"name":"Priority","value":{"name":"High","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	update := IssueUpdate{
+		Summary:     "New title",
+		Description: "New description",
+		Type:        "Task",
+		Priority:    "High",
+	}
+	issue, raw, err := NewClient(server.URL, "perm:token").UpdateIssue(context.Background(), "YR-14", update)
+	if err != nil {
+		t.Fatalf("UpdateIssue() error = %v", err)
+	}
+
+	wantPath := "/api/issues/YR-14?fields=id,idReadable,summary,description,customFields(name,value(name,login))"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if gotPayload["summary"] != "New title" || gotPayload["description"] != "New description" {
+		t.Fatalf("payload = %#v, want summary and description", gotPayload)
+	}
+	fields := gotPayload["customFields"].([]any)
+	typeField := fields[0].(map[string]any)
+	typeValue := typeField["value"].(map[string]any)
+	priorityField := fields[1].(map[string]any)
+	priorityValue := priorityField["value"].(map[string]any)
+	if typeField["name"] != "Type" || typeValue["name"] != "Task" {
+		t.Fatalf("type custom field = %#v, want Type Task", typeField)
+	}
+	if priorityField["name"] != "Priority" || priorityValue["name"] != "High" {
+		t.Fatalf("priority custom field = %#v, want Priority High", priorityField)
+	}
+	if issue.IDReadable != "YR-14" || issue.Summary != "New title" || string(raw) == "" {
+		t.Fatalf("UpdateIssue() issue=%+v raw=%q, want parsed issue and raw JSON", issue, string(raw))
+	}
+}
+
 func TestListProjectBundleValuesFiltersCustomFieldBundles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))" {

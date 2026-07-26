@@ -505,6 +505,10 @@ ytrack unset-project-id</code></pre>
               <pre><code>ytrack issue create &lt;summary&gt;
 ytrack issue create &lt;summary&gt; &lt;description&gt;
 ytrack issue show &lt;issue-id&gt;
+ytrack issue edit &lt;issue-id&gt; --title &lt;title&gt;
+ytrack issue edit &lt;issue-id&gt; -t &lt;title&gt; -d &lt;description&gt; --type &lt;type&gt; --priority &lt;priority&gt;
+ytrack issue type &lt;issue-id&gt; &lt;type&gt;
+ytrack issue priority &lt;issue-id&gt; &lt;priority&gt;
 ytrack issue status &lt;issue-id&gt; &lt;status&gt;</code></pre>
             </article>
 
@@ -611,6 +615,7 @@ project_id: 0-1</code></pre>
             <pre><code>ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
 ytrack --json issue show ART-123
+ytrack --json issue edit ART-123 --title "New title"
 ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20
