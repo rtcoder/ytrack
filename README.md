@@ -315,6 +315,7 @@ IDs and logins so you can run the command again with a more specific value.
 ```sh
 ytrack project create [title]
 ytrack project create [title] --key <project-key> --leader <user>
+ytrack project create [title] --key <project-key> --leader <user> --set-project-id
 ytrack project create [title] --key <project-key> --leader <user> --template kanban
 ytrack project create [title] --key <project-key> --leader <user> --template scrum
 ```
@@ -325,11 +326,15 @@ Create a project with command-line arguments:
 ytrack project create "Mobile App" --key MOB --leader me
 ytrack project create "Mobile App" --key MOB --leader rtcoder
 ytrack project create "Mobile App" --key MOB --leader 1-2
+ytrack project create "Mobile App" --key MOB --leader me --set-project-id
 ```
 
 The `--leader` value accepts the same references as `ytrack user find`: `me`, a
 YouTrack user ID, login, name, or email. The command resolves it to the user ID
 required by YouTrack before creating the project.
+
+Use `--set-project-id` to save the newly created project ID to the local
+`./.ytrack/config.json` for the current directory.
 
 Run without arguments to answer prompts:
 
@@ -341,6 +346,15 @@ Set project key:
 MOB
 Set leader:
 me
+Set new project as local project_id? [y/N]
+y
+```
+
+If the current directory already has a local `project_id`, interactive mode asks
+before overwriting it:
+
+```text
+Local project_id is 0-1. Overwrite with 0-16? [y/N]
 ```
 
 ### JSON Output

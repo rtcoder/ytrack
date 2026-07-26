@@ -373,7 +373,7 @@ ytrack set-project-id 0-1
 ytrack issue create "Crash on save" "Steps to reproduce"
 ytrack issue status ART-123 Done
 ytrack user me
-ytrack project create "Mobile App" --key MOB --leader me</code></pre>
+ytrack project create "Mobile App" --key MOB --leader me --set-project-id</code></pre>
         </div>
       </section>
 
@@ -442,7 +442,7 @@ ytrack set-project-id 0-1
 ytrack issue create "Crash on save" "Steps to reproduce..."
 ytrack issue status ART-123 Done
 ytrack user list --top 20
-ytrack project create "Mobile App" --key MOB --leader rtcoder</code></pre>
+ytrack project create "Mobile App" --key MOB --leader rtcoder --set-project-id</code></pre>
             </div>
           </div>
         </div>
@@ -522,12 +522,13 @@ ytrack user find &lt;query&gt;</code></pre>
               <div>
                 <span class="pill">Projects</span>
                 <h3>Create</h3>
-                <p>Create YouTrack projects with flags or interactive prompts.</p>
+                <p>Create YouTrack projects with flags or interactive prompts, and optionally save the new local project ID.</p>
               </div>
               <pre><code>ytrack project create [title]
 ytrack project create "Mobile App" --key MOB --leader me
 ytrack project create "Mobile App" --key MOB --leader rtcoder
 ytrack project create "Mobile App" --key MOB --leader 1-2
+ytrack project create "Mobile App" --key MOB --leader me --set-project-id
 ytrack project create "Mobile App" --key MOB --leader me --template kanban</code></pre>
             </article>
           </div>
@@ -638,6 +639,7 @@ ytrack --json project create "Mobile App" --key MOB --leader me</code></pre>
                 <li>project name</li>
                 <li>project key</li>
                 <li>resolvable leader</li>
+                <li>optional <code>--set-project-id</code></li>
               </ul>
             </article>
           </div>

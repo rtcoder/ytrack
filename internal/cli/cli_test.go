@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -261,6 +262,67 @@ func TestProjectCreatePromptsForMissingValues(t *testing.T) {
 	}
 }
 
+func TestProjectCreateSetProjectIDFlagSavesNewProjectAsLocalProject(t *testing.T) {
+	server := newProjectCreateServer(t, "0-16")
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "project", "create", "Mobile App", "--key", "MOB", "--leader", "me", "--set-project-id")
+
+	if !strings.Contains(out, "Saved local project_id: 0-16") {
+		t.Fatalf("project create output = %q, want local project_id confirmation", out)
+	}
+	cfg, err := config.Load(paths.Local)
+	if err != nil {
+		t.Fatalf("load local config: %v", err)
+	}
+	if cfg.ProjectID != "0-16" {
+		t.Fatalf("local project_id = %q, want 0-16", cfg.ProjectID)
+	}
+}
+
+func TestProjectCreateInteractivePromptsToSaveNewProjectAsLocalProject(t *testing.T) {
+	server := newProjectCreateServer(t, "0-16")
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLIWithInput(t, paths, "Mobile App\nMOB\nme\ny\n", "project", "create")
+
+	if !strings.Contains(out, "Set new project as local project_id? [y/N]") {
+		t.Fatalf("project create output = %q, want save project prompt", out)
+	}
+	cfg, err := config.Load(paths.Local)
+	if err != nil {
+		t.Fatalf("load local config: %v", err)
+	}
+	if cfg.ProjectID != "0-16" {
+		t.Fatalf("local project_id = %q, want 0-16", cfg.ProjectID)
+	}
+}
+
+func TestProjectCreateInteractivePromptsBeforeOverwritingExistingProjectID(t *testing.T) {
+	server := newProjectCreateServer(t, "0-16")
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-1")
+
+	out := runCLIWithInput(t, paths, "Mobile App\nMOB\nme\nn\n", "project", "create")
+
+	if !strings.Contains(out, "Local project_id is 0-1. Overwrite with 0-16? [y/N]") {
+		t.Fatalf("project create output = %q, want overwrite prompt", out)
+	}
+	cfg, err := config.Load(paths.Local)
+	if err != nil {
+		t.Fatalf("load local config: %v", err)
+	}
+	if cfg.ProjectID != "0-1" {
+		t.Fatalf("local project_id = %q, want existing value preserved", cfg.ProjectID)
+	}
+}
+
 func TestProjectCreateJSONPrintsRawResponse(t *testing.T) {
 	raw := `{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +344,51 @@ func TestProjectCreateJSONPrintsRawResponse(t *testing.T) {
 	if strings.TrimSpace(out) != raw {
 		t.Fatalf("project create json output = %q, want raw JSON", out)
 	}
+}
+
+func TestProjectCreateJSONWithSetProjectIDSavesLocalProjectAndPrintsOnlyRawResponse(t *testing.T) {
+	raw := `{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/admin/projects":
+			_, _ = w.Write([]byte(raw))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "--json", "project", "create", "Mobile App", "--key", "MOB", "--leader", "me", "--set-project-id")
+
+	if strings.TrimSpace(out) != raw {
+		t.Fatalf("project create json output = %q, want raw JSON only", out)
+	}
+	cfg, err := config.Load(paths.Local)
+	if err != nil {
+		t.Fatalf("load local config: %v", err)
+	}
+	if cfg.ProjectID != "0-16" {
+		t.Fatalf("local project_id = %q, want 0-16", cfg.ProjectID)
+	}
+}
+
+func newProjectCreateServer(t *testing.T, projectID string) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/admin/projects":
+			fmt.Fprintf(w, `{"id":%q,"shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`, projectID)
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
 }
 
 func configuredPaths(t *testing.T, serverURL string) config.Paths {

@@ -379,7 +379,12 @@ func (a *app) newProjectCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			setProjectID, err := cmd.Flags().GetBool("set-project-id")
+			if err != nil {
+				return err
+			}
 
+			interactive := strings.TrimSpace(title) == "" || strings.TrimSpace(key) == "" || strings.TrimSpace(leaderRef) == ""
 			reader := bufio.NewReader(a.in)
 			if strings.TrimSpace(title) == "" {
 				title, err = a.prompt(reader, "Set project name:")
@@ -424,18 +429,31 @@ func (a *app) newProjectCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			saveProjectID, err := a.shouldSaveProjectID(reader, project.ID, setProjectID, interactive)
+			if err != nil {
+				return err
+			}
+			if saveProjectID {
+				if err := a.saveLocalProjectID(project.ID); err != nil {
+					return err
+				}
+			}
 			if a.jsonOutput {
 				fmt.Fprintf(a.out, "%s\n", raw)
 				return nil
 			}
 			fmt.Fprintf(a.out, "Created project %s: %q\n", project.ShortName, project.Name)
 			fmt.Fprintf(a.out, "id: %s\n", project.ID)
+			if saveProjectID {
+				fmt.Fprintf(a.out, "Saved local project_id: %s\n", project.ID)
+			}
 			return nil
 		},
 	}
 	createCmd.Flags().String("key", "", "project key")
 	createCmd.Flags().String("leader", "", "project leader as me, user ID, login, name, or email")
 	createCmd.Flags().String("template", "", "project template: scrum or kanban")
+	createCmd.Flags().Bool("set-project-id", false, "save the created project ID as the local project_id")
 	cmd.AddCommand(createCmd)
 
 	return cmd
@@ -459,6 +477,41 @@ func (a *app) prompt(reader *bufio.Reader, label string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(value), nil
+}
+
+func (a *app) shouldSaveProjectID(reader *bufio.Reader, projectID string, setProjectID, interactive bool) (bool, error) {
+	if setProjectID {
+		return true, nil
+	}
+	if !interactive {
+		return false, nil
+	}
+
+	cfg, err := config.Load(a.paths.Local)
+	if err != nil {
+		return false, err
+	}
+	if cfg.ProjectID != "" {
+		return a.confirm(reader, fmt.Sprintf("Local project_id is %s. Overwrite with %s? [y/N]", cfg.ProjectID, projectID))
+	}
+	return a.confirm(reader, "Set new project as local project_id? [y/N]")
+}
+
+func (a *app) confirm(reader *bufio.Reader, label string) (bool, error) {
+	answer, err := a.prompt(reader, label)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes"), nil
+}
+
+func (a *app) saveLocalProjectID(projectID string) error {
+	cfg, err := config.Load(a.paths.Local)
+	if err != nil {
+		return err
+	}
+	cfg.ProjectID = projectID
+	return config.Save(a.paths.Local, cfg)
 }
 
 func (a *app) printConfig(cfg config.Config) {
