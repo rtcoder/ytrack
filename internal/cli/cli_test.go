@@ -153,6 +153,137 @@ func TestUserMeJSONPrintsRawResponse(t *testing.T) {
 	}
 }
 
+func TestProjectCreateWithFlagsResolvesSupportedLeaderRefs(t *testing.T) {
+	tests := []struct {
+		name       string
+		leaderRef  string
+		leaderID   string
+		leaderPath string
+		leaderBody string
+	}{
+		{
+			name:       "me",
+			leaderRef:  "me",
+			leaderID:   "1-2",
+			leaderPath: "/api/users/me",
+			leaderBody: `{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`,
+		},
+		{
+			name:       "login",
+			leaderRef:  "rtcoder",
+			leaderID:   "1-2",
+			leaderPath: "/api/users",
+			leaderBody: `[
+				{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","banned":false,"$type":"User"},
+				{"id":"24-56","login":"m.scott","name":"Michael Scott","fullName":"Michael Scott","email":"michael@example.com","banned":false,"$type":"User"}
+			]`,
+		},
+		{
+			name:       "id",
+			leaderRef:  "1-2",
+			leaderID:   "1-2",
+			leaderPath: "/api/users/1-2",
+			leaderBody: `{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","banned":false,"$type":"User"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPayload map[string]any
+			var sawLeaderLookup bool
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case tt.leaderPath:
+					sawLeaderLookup = true
+					_, _ = w.Write([]byte(tt.leaderBody))
+				case "/api/admin/projects":
+					if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+						t.Fatalf("decode request body: %v", err)
+					}
+					_, _ = w.Write([]byte(`{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`))
+				default:
+					t.Fatalf("unexpected path %s", r.URL.Path)
+				}
+			}))
+			defer server.Close()
+
+			paths := configuredPaths(t, server.URL)
+
+			out := runCLI(t, paths, "project", "create", "Mobile App", "--key", "MOB", "--leader", tt.leaderRef)
+
+			if !sawLeaderLookup {
+				t.Fatalf("leader lookup for %q was not requested", tt.leaderRef)
+			}
+			if gotPayload["name"] != "Mobile App" || gotPayload["shortName"] != "MOB" {
+				t.Fatalf("payload = %#v, want project name and key", gotPayload)
+			}
+			leader := gotPayload["leader"].(map[string]any)
+			if leader["id"] != tt.leaderID {
+				t.Fatalf("leader id = %q, want %s", leader["id"], tt.leaderID)
+			}
+			if !strings.Contains(out, `Created project MOB: "Mobile App"`) || !strings.Contains(out, "id: 0-16") {
+				t.Fatalf("project create output = %q, want created project details", out)
+			}
+		})
+	}
+}
+
+func TestProjectCreatePromptsForMissingValues(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/admin/projects":
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLIWithInput(t, paths, "Mobile App\nMOB\nme\n", "project", "create")
+
+	if !strings.Contains(out, "Set project name:") || !strings.Contains(out, "Set project key:") || !strings.Contains(out, "Set leader:") {
+		t.Fatalf("project create interactive output = %q, want prompts", out)
+	}
+	if gotPayload["name"] != "Mobile App" || gotPayload["shortName"] != "MOB" {
+		t.Fatalf("payload = %#v, want prompted project name and key", gotPayload)
+	}
+	leader := gotPayload["leader"].(map[string]any)
+	if leader["id"] != "1-2" {
+		t.Fatalf("leader id = %q, want 1-2", leader["id"])
+	}
+}
+
+func TestProjectCreateJSONPrintsRawResponse(t *testing.T) {
+	raw := `{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/admin/projects":
+			_, _ = w.Write([]byte(raw))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "--json", "project", "create", "Mobile App", "--key", "MOB", "--leader", "me")
+
+	if strings.TrimSpace(out) != raw {
+		t.Fatalf("project create json output = %q, want raw JSON", out)
+	}
+}
+
 func configuredPaths(t *testing.T, serverURL string) config.Paths {
 	t.Helper()
 
@@ -168,10 +299,16 @@ func configuredPaths(t *testing.T, serverURL string) config.Paths {
 
 func runCLI(t *testing.T, paths config.Paths, args ...string) string {
 	t.Helper()
+	return runCLIWithInput(t, paths, "", args...)
+}
+
+func runCLIWithInput(t *testing.T, paths config.Paths, input string, args ...string) string {
+	t.Helper()
 
 	var out, errOut bytes.Buffer
 	cmd := NewRootCommand(Options{
 		Paths: paths,
+		In:    strings.NewReader(input),
 		Out:   &out,
 		Err:   &errOut,
 	})

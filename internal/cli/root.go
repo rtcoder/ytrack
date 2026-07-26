@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/rtcoder/ytrack/internal/config"
@@ -15,12 +17,14 @@ import (
 
 type Options struct {
 	Paths config.Paths
+	In    io.Reader
 	Out   io.Writer
 	Err   io.Writer
 }
 
 type app struct {
 	paths      config.Paths
+	in         io.Reader
 	out        io.Writer
 	err        io.Writer
 	jsonOutput bool
@@ -35,6 +39,10 @@ func NewRootCommand(opts Options) *cobra.Command {
 	if errOut == nil {
 		errOut = os.Stderr
 	}
+	in := opts.In
+	if in == nil {
+		in = os.Stdin
+	}
 
 	paths := opts.Paths
 	if paths.Global == "" || paths.Local == "" {
@@ -44,7 +52,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 		}
 	}
 
-	a := &app{paths: paths, out: out, err: errOut}
+	a := &app{paths: paths, in: in, out: out, err: errOut}
 	root := &cobra.Command{
 		Use:           "ytrack",
 		Short:         "Manage YouTrack issues from your terminal",
@@ -65,6 +73,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 	root.AddCommand(a.newShowCommand())
 	root.AddCommand(a.newIssueCommand())
 	root.AddCommand(a.newUserCommand())
+	root.AddCommand(a.newProjectCommand())
 
 	return root
 }
@@ -343,6 +352,95 @@ func (a *app) newUserCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) newProjectCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "project",
+		Short: "Manage YouTrack projects",
+	}
+
+	createCmd := &cobra.Command{
+		Use:   "create [title]",
+		Short: "Create a YouTrack project",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			title := ""
+			if len(args) == 1 {
+				title = args[0]
+			}
+			key, err := cmd.Flags().GetString("key")
+			if err != nil {
+				return err
+			}
+			leaderRef, err := cmd.Flags().GetString("leader")
+			if err != nil {
+				return err
+			}
+			template, err := cmd.Flags().GetString("template")
+			if err != nil {
+				return err
+			}
+
+			reader := bufio.NewReader(a.in)
+			if strings.TrimSpace(title) == "" {
+				title, err = a.prompt(reader, "Set project name:")
+				if err != nil {
+					return err
+				}
+			}
+			if strings.TrimSpace(key) == "" {
+				key, err = a.prompt(reader, "Set project key:")
+				if err != nil {
+					return err
+				}
+			}
+			if strings.TrimSpace(leaderRef) == "" {
+				leaderRef, err = a.prompt(reader, "Set leader:")
+				if err != nil {
+					return err
+				}
+			}
+			title = strings.TrimSpace(title)
+			key = strings.TrimSpace(key)
+			leaderRef = strings.TrimSpace(leaderRef)
+			if title == "" {
+				return fmt.Errorf("missing project name")
+			}
+			if key == "" {
+				return fmt.Errorf("missing project key")
+			}
+			if leaderRef == "" {
+				return fmt.Errorf("missing project leader")
+			}
+
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			leader, err := client.ResolveUser(context.Background(), leaderRef)
+			if err != nil {
+				return err
+			}
+			project, raw, err := client.CreateProject(context.Background(), title, key, leader.ID, template)
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Created project %s: %q\n", project.ShortName, project.Name)
+			fmt.Fprintf(a.out, "id: %s\n", project.ID)
+			return nil
+		},
+	}
+	createCmd.Flags().String("key", "", "project key")
+	createCmd.Flags().String("leader", "", "project leader as me, user ID, login, name, or email")
+	createCmd.Flags().String("template", "", "project template: scrum or kanban")
+	cmd.AddCommand(createCmd)
+
+	return cmd
+}
+
 func (a *app) newYouTrackClient(fields ...string) (*youtrack.Client, error) {
 	cfg, err := config.LoadEffective(a.paths)
 	if err != nil {
@@ -352,6 +450,15 @@ func (a *app) newYouTrackClient(fields ...string) (*youtrack.Client, error) {
 		return nil, err
 	}
 	return youtrack.NewClient(cfg.URL, cfg.Token), nil
+}
+
+func (a *app) prompt(reader *bufio.Reader, label string) (string, error) {
+	fmt.Fprintln(a.out, label)
+	value, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	return strings.TrimSpace(value), nil
 }
 
 func (a *app) printConfig(cfg config.Config) {

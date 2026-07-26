@@ -350,8 +350,8 @@
           <h1>ytrack</h1>
           <p class="lead">
             A cross-platform CLI for creating YouTrack issues, moving their status,
-            inspecting users, and keeping global credentials separate from per-project
-            configuration.
+            inspecting users, creating projects, and keeping global credentials separate
+            from per-project configuration.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/rtcoder/ytrack/releases">Download</a>
@@ -372,7 +372,8 @@ ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce"
 ytrack issue status ART-123 Done
-ytrack user me</code></pre>
+ytrack user me
+ytrack project create "Mobile App" --key MOB --leader me</code></pre>
         </div>
       </section>
 
@@ -440,7 +441,8 @@ ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce..."
 ytrack issue status ART-123 Done
-ytrack user list --top 20</code></pre>
+ytrack user list --top 20
+ytrack project create "Mobile App" --key MOB --leader rtcoder</code></pre>
             </div>
           </div>
         </div>
@@ -515,6 +517,19 @@ ytrack user list --top &lt;count&gt;
 ytrack user list --skip &lt;count&gt;
 ytrack user find &lt;query&gt;</code></pre>
             </article>
+
+            <article class="card">
+              <div>
+                <span class="pill">Projects</span>
+                <h3>Create</h3>
+                <p>Create YouTrack projects with flags or interactive prompts.</p>
+              </div>
+              <pre><code>ytrack project create [title]
+ytrack project create "Mobile App" --key MOB --leader me
+ytrack project create "Mobile App" --key MOB --leader rtcoder
+ytrack project create "Mobile App" --key MOB --leader 1-2
+ytrack project create "Mobile App" --key MOB --leader me --template kanban</code></pre>
+            </article>
           </div>
 
           <div class="note">
@@ -583,7 +598,8 @@ project_id: 0-1</code></pre>
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
 ytrack --json issue status ART-123 Done
 ytrack --json user me
-ytrack --json user list --top 20</code></pre>
+ytrack --json user list --top 20
+ytrack --json project create "Mobile App" --key MOB --leader me</code></pre>
           </div>
         </div>
       </section>
@@ -612,6 +628,16 @@ ytrack --json user list --top 20</code></pre>
               <ul>
                 <li><code>url</code></li>
                 <li><code>token</code></li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3><code>project create</code></h3>
+              <ul>
+                <li><code>url</code></li>
+                <li><code>token</code></li>
+                <li>project name</li>
+                <li>project key</li>
+                <li>resolvable leader</li>
               </ul>
             </article>
           </div>

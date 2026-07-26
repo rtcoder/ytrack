@@ -249,6 +249,70 @@ func TestResolveUserReportsAmbiguousMatches(t *testing.T) {
 	}
 }
 
+func TestCreateProjectPostsExpectedPayloadAndReturnsProject(t *testing.T) {
+	var gotPath, gotAuth, gotContentType string
+	var gotPayload map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotAuth = r.Header.Get("Authorization")
+		gotContentType = r.Header.Get("Content-Type")
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`))
+	}))
+	defer server.Close()
+
+	project, raw, err := NewClient(server.URL, "perm:token").CreateProject(context.Background(), "Mobile App", "MOB", "1-2", "")
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+
+	wantPath := "/api/admin/projects?fields=id,shortName,name,leader(id,login,name)"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if gotAuth != "Bearer perm:token" {
+		t.Fatalf("Authorization = %q, want bearer token", gotAuth)
+	}
+	if gotContentType != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", gotContentType)
+	}
+	if gotPayload["name"] != "Mobile App" || gotPayload["shortName"] != "MOB" {
+		t.Fatalf("payload = %#v, want name and shortName", gotPayload)
+	}
+	leader := gotPayload["leader"].(map[string]any)
+	if leader["id"] != "1-2" {
+		t.Fatalf("leader id = %q, want 1-2", leader["id"])
+	}
+	if project.ID != "0-16" || project.ShortName != "MOB" || project.Name != "Mobile App" || project.Leader.ID != "1-2" || string(raw) == "" {
+		t.Fatalf("CreateProject() project=%+v raw=%q, want parsed project and raw JSON", project, string(raw))
+	}
+}
+
+func TestCreateProjectUsesTemplateQueryParameter(t *testing.T) {
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`{"id":"0-16","shortName":"MOB","name":"Mobile App","leader":{"id":"1-2","login":"rtcoder","name":"Robert","$type":"User"},"$type":"Project"}`))
+	}))
+	defer server.Close()
+
+	_, _, err := NewClient(server.URL, "perm:token").CreateProject(context.Background(), "Mobile App", "MOB", "1-2", "kanban")
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+
+	wantPath := "/api/admin/projects?fields=id%2CshortName%2Cname%2Cleader%28id%2Clogin%2Cname%29&template=kanban"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+}
+
 func TestClientReturnsHTTPErrorBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad token", http.StatusUnauthorized)

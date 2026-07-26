@@ -39,6 +39,13 @@ type User struct {
 	Banned   bool   `json:"banned"`
 }
 
+type Project struct {
+	ID        string `json:"id"`
+	ShortName string `json:"shortName"`
+	Name      string `json:"name"`
+	Leader    User   `json:"leader"`
+}
+
 func NewClient(baseURL, token string) *Client {
 	return &Client{
 		BaseURL:    strings.TrimRight(baseURL, "/"),
@@ -163,6 +170,32 @@ func (c *Client) ResolveUser(ctx context.Context, ref string) (User, error) {
 	default:
 		return User{}, fmt.Errorf("ambiguous user %q, matches: %s", ref, formatUserMatches(matches))
 	}
+}
+
+func (c *Client) CreateProject(ctx context.Context, name, shortName, leaderID, template string) (Project, []byte, error) {
+	payload := map[string]any{
+		"name":      name,
+		"shortName": shortName,
+		"leader":    map[string]string{"id": leaderID},
+	}
+
+	path := "/api/admin/projects?fields=id,shortName,name,leader(id,login,name)"
+	if template != "" {
+		values := url.Values{}
+		values.Set("fields", "id,shortName,name,leader(id,login,name)")
+		values.Set("template", template)
+		path = "/api/admin/projects?" + values.Encode()
+	}
+
+	var project Project
+	raw, err := c.doJSON(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return Project{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &project); err != nil {
+		return Project{}, raw, fmt.Errorf("parse create project response: %w", err)
+	}
+	return project, raw, nil
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, payload any) ([]byte, error) {

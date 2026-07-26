@@ -12,6 +12,7 @@ The project is an early MVP. It currently supports:
 - creating YouTrack issues
 - changing issue status through YouTrack commands
 - inspecting and resolving YouTrack users
+- creating YouTrack projects
 - raw JSON output for API-backed commands
 
 ## Installation
@@ -114,6 +115,12 @@ Show the current user:
 
 ```sh
 ytrack user me
+```
+
+Create a project:
+
+```sh
+ytrack project create "Mobile App" --key MOB --leader me
 ```
 
 ## Configuration Model
@@ -303,6 +310,39 @@ ytrack user find m.scott
 If a search matches multiple users, `ytrack` prints an error with the matching
 IDs and logins so you can run the command again with a more specific value.
 
+### Projects
+
+```sh
+ytrack project create [title]
+ytrack project create [title] --key <project-key> --leader <user>
+ytrack project create [title] --key <project-key> --leader <user> --template kanban
+ytrack project create [title] --key <project-key> --leader <user> --template scrum
+```
+
+Create a project with command-line arguments:
+
+```sh
+ytrack project create "Mobile App" --key MOB --leader me
+ytrack project create "Mobile App" --key MOB --leader rtcoder
+ytrack project create "Mobile App" --key MOB --leader 1-2
+```
+
+The `--leader` value accepts the same references as `ytrack user find`: `me`, a
+YouTrack user ID, login, name, or email. The command resolves it to the user ID
+required by YouTrack before creating the project.
+
+Run without arguments to answer prompts:
+
+```text
+$ ytrack project create
+Set project name:
+Mobile App
+Set project key:
+MOB
+Set leader:
+me
+```
+
 ### JSON Output
 
 Use `--json` before the command:
@@ -313,6 +353,7 @@ ytrack --json issue create "Crash on save" "Steps to reproduce..."
 ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20
+ytrack --json project create "Mobile App" --key MOB --leader me
 ```
 
 Without `--json`, successful commands print human-readable output:
@@ -341,6 +382,14 @@ User commands require:
 
 - `url`
 - `token`
+
+`project create` requires:
+
+- `url`
+- `token`
+- a project name
+- a project key
+- a resolvable project leader
 
 Missing values produce actionable errors, for example:
 
