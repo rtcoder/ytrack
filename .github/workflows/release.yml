@@ -107,7 +107,7 @@ jobs:
           fi
 
           if [ "${GOOS}" = "linux" ]; then
-            go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+            GOOS="$(go env GOHOSTOS)" GOARCH="$(go env GOHOSTARCH)" go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
             nfpm_bin="$(go env GOPATH)/bin/nfpm"
 
             VERSION="${version}" "${nfpm_bin}" pkg --config nfpm.yaml --packager deb --target "package/${package_name}.deb"
@@ -119,7 +119,6 @@ jobs:
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
           path: package/*
-          archive: false
           if-no-files-found: error
 
   release:
