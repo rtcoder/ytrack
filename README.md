@@ -253,6 +253,9 @@ ytrack issue show <issue-id>
 ytrack issue edit <issue-id> [--title <title>] [--description <description>] [--type <type>] [--priority <priority>]
 ytrack issue type <issue-id> <type>
 ytrack issue priority <issue-id> <priority>
+ytrack issue comment <issue-id> <text>
+ytrack issue assign <issue-id> <user>
+ytrack issue command <issue-id> <command>
 ytrack issue status <issue-id> <status>
 ```
 
@@ -294,6 +297,14 @@ ytrack issue edit ART-123 --title "New title"
 ytrack issue edit ART-123 -t "New title" -d "New description" --type Task --priority High
 ytrack issue type ART-123 Task
 ytrack issue priority ART-123 High
+```
+
+Comment, assign, or run a raw YouTrack command:
+
+```sh
+ytrack issue comment ART-123 "Looks good"
+ytrack issue assign ART-123 me
+ytrack issue command ART-123 "Priority Critical"
 ```
 
 `issue status` sends a YouTrack command in this form:
@@ -417,6 +428,8 @@ ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
 ytrack --json issue show ART-123
 ytrack --json issue edit ART-123 --title "New title"
+ytrack --json issue comment ART-123 "Looks good"
+ytrack --json issue command ART-123 "Priority Critical"
 ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20

@@ -48,7 +48,14 @@ type IssueUpdate struct {
 	Summary     string
 	Description string
 	Type        string
+	AssigneeID  string
 	Priority    string
+}
+
+type IssueComment struct {
+	ID     string `json:"id"`
+	Text   string `json:"text"`
+	Author User   `json:"author"`
 }
 
 type CreateIssueOptions struct {
@@ -132,22 +139,7 @@ func (c *Client) CreateIssueWithOptions(ctx context.Context, projectID, summary,
 }
 
 func (c *Client) SetStatus(ctx context.Context, issueID, status string) (CommandResult, []byte, error) {
-	payload := map[string]any{
-		"query": "State " + status,
-		"issues": []map[string]string{
-			{"idReadable": issueID},
-		},
-	}
-
-	var result CommandResult
-	raw, err := c.doJSON(ctx, http.MethodPost, "/api/commands?fields=issues(id,idReadable,summary),commands,errors", payload)
-	if err != nil {
-		return CommandResult{}, nil, err
-	}
-	if err := json.Unmarshal(raw, &result); err != nil {
-		return CommandResult{}, raw, fmt.Errorf("parse set status response: %w", err)
-	}
-	return result, raw, nil
+	return c.ApplyCommand(ctx, issueID, "State "+status)
 }
 
 func (c *Client) GetIssue(ctx context.Context, issueID string) (ProjectIssue, []byte, error) {
@@ -176,6 +168,9 @@ func (c *Client) UpdateIssue(ctx context.Context, issueID string, update IssueUp
 	if update.Type != "" {
 		customFields = append(customFields, enumIssueCustomField("Type", update.Type))
 	}
+	if update.AssigneeID != "" {
+		customFields = append(customFields, userIssueCustomField("Assignee", update.AssigneeID))
+	}
 	if update.Priority != "" {
 		customFields = append(customFields, enumIssueCustomField("Priority", update.Priority))
 	}
@@ -193,6 +188,39 @@ func (c *Client) UpdateIssue(ctx context.Context, issueID string, update IssueUp
 		return ProjectIssue{}, raw, fmt.Errorf("parse update issue response: %w", err)
 	}
 	return issue, raw, nil
+}
+
+func (c *Client) AddIssueComment(ctx context.Context, issueID, text string) (IssueComment, []byte, error) {
+	payload := map[string]any{"text": text}
+	var comment IssueComment
+	path := "/api/issues/" + url.PathEscape(issueID) + "/comments?fields=id,text,author(login)"
+	raw, err := c.doJSON(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return IssueComment{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &comment); err != nil {
+		return IssueComment{}, raw, fmt.Errorf("parse add comment response: %w", err)
+	}
+	return comment, raw, nil
+}
+
+func (c *Client) ApplyCommand(ctx context.Context, issueID, command string) (CommandResult, []byte, error) {
+	payload := map[string]any{
+		"query": command,
+		"issues": []map[string]string{
+			{"idReadable": issueID},
+		},
+	}
+
+	var result CommandResult
+	raw, err := c.doJSON(ctx, http.MethodPost, "/api/commands?fields=issues(id,idReadable,summary),commands,errors", payload)
+	if err != nil {
+		return CommandResult{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return CommandResult{}, raw, fmt.Errorf("parse command response: %w", err)
+	}
+	return result, raw, nil
 }
 
 func (c *Client) GetMe(ctx context.Context) (User, []byte, error) {
@@ -518,20 +546,24 @@ func enumIssueCustomField(name, value string) map[string]any {
 	}
 }
 
+func userIssueCustomField(name, userID string) map[string]any {
+	return map[string]any{
+		"name":  name,
+		"$type": "SingleUserIssueCustomField",
+		"value": map[string]any{
+			"id":    userID,
+			"$type": "User",
+		},
+	}
+}
+
 func createIssueCustomFields(opts CreateIssueOptions) []map[string]any {
 	var fields []map[string]any
 	if opts.Type != "" {
 		fields = append(fields, enumIssueCustomField("Type", opts.Type))
 	}
 	if opts.AssigneeID != "" {
-		fields = append(fields, map[string]any{
-			"name":  "Assignee",
-			"$type": "SingleUserIssueCustomField",
-			"value": map[string]any{
-				"id":    opts.AssigneeID,
-				"$type": "User",
-			},
-		})
+		fields = append(fields, userIssueCustomField("Assignee", opts.AssigneeID))
 	}
 	if opts.Priority != "" {
 		fields = append(fields, enumIssueCustomField("Priority", opts.Priority))

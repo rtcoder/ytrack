@@ -502,6 +502,85 @@ func TestUpdateIssuePostsSummaryDescriptionAndCustomFields(t *testing.T) {
 	}
 }
 
+func TestUpdateIssueCanSetAssignee(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"Assignee","value":{"id":"1-2","login":"rtcoder","$type":"User"},"$type":"SingleUserIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	_, _, err := NewClient(server.URL, "perm:token").UpdateIssue(context.Background(), "YR-14", IssueUpdate{AssigneeID: "1-2"})
+	if err != nil {
+		t.Fatalf("UpdateIssue() error = %v", err)
+	}
+
+	fields := gotPayload["customFields"].([]any)
+	assignee := fields[0].(map[string]any)
+	value := assignee["value"].(map[string]any)
+	if assignee["name"] != "Assignee" || value["id"] != "1-2" {
+		t.Fatalf("assignee field = %#v, want Assignee 1-2", assignee)
+	}
+}
+
+func TestAddIssueCommentPostsText(t *testing.T) {
+	var gotPath string
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"4-1","text":"Looks good","author":{"login":"rtcoder","$type":"User"},"$type":"IssueComment"}`))
+	}))
+	defer server.Close()
+
+	comment, raw, err := NewClient(server.URL, "perm:token").AddIssueComment(context.Background(), "YR-14", "Looks good")
+	if err != nil {
+		t.Fatalf("AddIssueComment() error = %v", err)
+	}
+
+	wantPath := "/api/issues/YR-14/comments?fields=id,text,author(login)"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if gotPayload["text"] != "Looks good" {
+		t.Fatalf("payload = %#v, want comment text", gotPayload)
+	}
+	if comment.ID != "4-1" || comment.Text != "Looks good" || string(raw) == "" {
+		t.Fatalf("AddIssueComment() comment=%+v raw=%q, want parsed comment and raw JSON", comment, string(raw))
+	}
+}
+
+func TestApplyCommandPostsArbitraryCommand(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"issues":[{"id":"3-1","idReadable":"YR-14","summary":"Add init"}],"commands":"Priority High","errors":[]}`))
+	}))
+	defer server.Close()
+
+	result, raw, err := NewClient(server.URL, "perm:token").ApplyCommand(context.Background(), "YR-14", "Priority High")
+	if err != nil {
+		t.Fatalf("ApplyCommand() error = %v", err)
+	}
+
+	if gotPayload["query"] != "Priority High" {
+		t.Fatalf("query = %q, want Priority High", gotPayload["query"])
+	}
+	issues := gotPayload["issues"].([]any)
+	if issues[0].(map[string]any)["idReadable"] != "YR-14" {
+		t.Fatalf("issues = %#v, want YR-14", issues)
+	}
+	if len(result.Issues) != 1 || string(raw) == "" {
+		t.Fatalf("ApplyCommand() result=%+v raw=%q, want parsed response and raw JSON", result, string(raw))
+	}
+}
+
 func TestListProjectBundleValuesFiltersCustomFieldBundles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))" {

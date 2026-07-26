@@ -247,6 +247,90 @@ func TestIssueEditJSONPrintsRawResponse(t *testing.T) {
 	}
 }
 
+func TestIssueCommentAddsComment(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/issues/YR-14/comments" {
+			t.Fatalf("path = %q, want comments endpoint", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"4-1","text":"Looks good","author":{"login":"rtcoder","$type":"User"},"$type":"IssueComment"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "comment", "YR-14", "Looks good")
+
+	if gotPayload["text"] != "Looks good" {
+		t.Fatalf("payload = %#v, want comment text", gotPayload)
+	}
+	if !strings.Contains(out, "Added comment to YR-14") {
+		t.Fatalf("issue comment output = %q, want confirmation", out)
+	}
+}
+
+func TestIssueAssignResolvesUserAndSetsAssignee(t *testing.T) {
+	var gotPayload map[string]any
+	var sawUserLookup bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			sawUserLookup = true
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/issues/YR-14":
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"Assignee","value":{"id":"1-2","login":"rtcoder","$type":"User"},"$type":"SingleUserIssueCustomField"}],"$type":"Issue"}`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "assign", "YR-14", "me")
+
+	if !sawUserLookup {
+		t.Fatal("user lookup was not requested")
+	}
+	fields := gotPayload["customFields"].([]any)
+	assignee := fields[0].(map[string]any)
+	value := assignee["value"].(map[string]any)
+	if assignee["name"] != "Assignee" || value["id"] != "1-2" {
+		t.Fatalf("payload = %#v, want assignee 1-2", gotPayload)
+	}
+	if !strings.Contains(out, "Updated YR-14 assignee to me") {
+		t.Fatalf("issue assign output = %q, want confirmation", out)
+	}
+}
+
+func TestIssueCommandAppliesArbitraryCommand(t *testing.T) {
+	var gotPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"issues":[{"id":"3-1","idReadable":"YR-14","summary":"Add init"}],"commands":"Priority High","errors":[]}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "command", "YR-14", "Priority High")
+
+	if gotPayload["query"] != "Priority High" {
+		t.Fatalf("payload = %#v, want command query", gotPayload)
+	}
+	if !strings.Contains(out, "Updated YR-14") {
+		t.Fatalf("issue command output = %q, want update confirmation", out)
+	}
+}
+
 func TestUserMePrintsCurrentUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))

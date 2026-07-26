@@ -301,6 +301,77 @@ func (a *app) newIssueCommand() *cobra.Command {
 			return nil
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "comment <issue-id> <text>",
+		Short: "Add a comment to a YouTrack issue",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			_, raw, err := client.AddIssueComment(context.Background(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Added comment to %s\n", args[0])
+			return nil
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "assign <issue-id> <user>",
+		Short: "Assign a YouTrack issue",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			user, err := client.ResolveUser(context.Background(), args[1])
+			if err != nil {
+				return err
+			}
+			issue, raw, err := client.UpdateIssue(context.Background(), args[0], youtrack.IssueUpdate{AssigneeID: user.ID})
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s assignee to %s\n", issue.IDReadable, args[1])
+			return nil
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "command <issue-id> <command>",
+		Short: "Apply an arbitrary YouTrack command to an issue",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := a.newYouTrackClient("url", "token")
+			if err != nil {
+				return err
+			}
+			result, raw, err := client.ApplyCommand(context.Background(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			if len(result.Issues) > 0 {
+				fmt.Fprintf(a.out, "Updated %s\n", result.Issues[0].IDReadable)
+				return nil
+			}
+			fmt.Fprintf(a.out, "Updated %s\n", args[0])
+			return nil
+		},
+	})
 	editCmd := &cobra.Command{
 		Use:   "edit <issue-id>",
 		Short: "Edit a YouTrack issue",
