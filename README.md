@@ -35,17 +35,27 @@ Download a release package from:
 https://github.com/rtcoder/ytrack/releases
 ```
 
-Debian/Ubuntu users can install the release `.deb` package:
+### Ubuntu / Debian
+
+Download the `.deb` package for your CPU architecture from GitHub Releases,
+then install it with `apt`:
 
 ```sh
 sudo apt install ./ytrack_<version>_linux_amd64.deb
 ```
 
-Fedora/RHEL users can install the release `.rpm` package:
+Use `ytrack_<version>_linux_arm64.deb` instead on ARM64 systems.
+
+### Fedora
+
+Download the `.rpm` package for your CPU architecture from GitHub Releases,
+then install it with `dnf`:
 
 ```sh
 sudo dnf install ./ytrack_<version>_linux_amd64.rpm
 ```
+
+Use `ytrack_<version>_linux_arm64.rpm` instead on ARM64 systems.
 
 Release assets include:
 
