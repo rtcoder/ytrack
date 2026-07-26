@@ -51,6 +51,13 @@ type IssueUpdate struct {
 	Priority    string
 }
 
+type CreateIssueOptions struct {
+	Type       string
+	AssigneeID string
+	Priority   string
+	Version    string
+}
+
 type CommandResult struct {
 	Issues   []Issue         `json:"issues"`
 	Commands json.RawMessage `json:"commands"`
@@ -97,12 +104,20 @@ func NewClient(baseURL, token string) *Client {
 }
 
 func (c *Client) CreateIssue(ctx context.Context, projectID, summary, description string) (Issue, []byte, error) {
+	return c.CreateIssueWithOptions(ctx, projectID, summary, description, CreateIssueOptions{})
+}
+
+func (c *Client) CreateIssueWithOptions(ctx context.Context, projectID, summary, description string, opts CreateIssueOptions) (Issue, []byte, error) {
 	payload := map[string]any{
 		"project": map[string]string{"id": projectID},
 		"summary": summary,
 	}
 	if description != "" {
 		payload["description"] = description
+	}
+	customFields := createIssueCustomFields(opts)
+	if len(customFields) > 0 {
+		payload["customFields"] = customFields
 	}
 
 	var issue Issue
@@ -501,4 +516,37 @@ func enumIssueCustomField(name, value string) map[string]any {
 			"$type": "EnumBundleElement",
 		},
 	}
+}
+
+func createIssueCustomFields(opts CreateIssueOptions) []map[string]any {
+	var fields []map[string]any
+	if opts.Type != "" {
+		fields = append(fields, enumIssueCustomField("Type", opts.Type))
+	}
+	if opts.AssigneeID != "" {
+		fields = append(fields, map[string]any{
+			"name":  "Assignee",
+			"$type": "SingleUserIssueCustomField",
+			"value": map[string]any{
+				"id":    opts.AssigneeID,
+				"$type": "User",
+			},
+		})
+	}
+	if opts.Priority != "" {
+		fields = append(fields, enumIssueCustomField("Priority", opts.Priority))
+	}
+	if opts.Version != "" {
+		fields = append(fields, map[string]any{
+			"name":  "Fix versions",
+			"$type": "MultiVersionIssueCustomField",
+			"value": []map[string]any{
+				{
+					"name":  opts.Version,
+					"$type": "VersionBundleElement",
+				},
+			},
+		})
+	}
+	return fields
 }

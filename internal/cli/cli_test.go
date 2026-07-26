@@ -70,6 +70,48 @@ func TestIssueCreateJSONUsesEffectiveConfig(t *testing.T) {
 	}
 }
 
+func TestIssueCreateAcceptsMetadataOptions(t *testing.T) {
+	var gotPayload map[string]any
+	var sawAssigneeLookup bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users/me":
+			sawAssigneeLookup = true
+			_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))
+		case "/api/issues":
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"id":"2-1","idReadable":"ART-123","summary":"Crash on save"}`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	temp := t.TempDir()
+	paths := config.Paths{
+		Global: filepath.Join(temp, "global", "config.json"),
+		Local:  filepath.Join(temp, "project", ".ytrack", "config.json"),
+	}
+	runCLI(t, paths, "global", "set-url", server.URL)
+	runCLI(t, paths, "global", "set-token", "perm:global-secret")
+	runCLI(t, paths, "set-project-id", "0-1")
+
+	out := runCLI(t, paths, "issue", "create", "Crash on save", "Steps", "--type", "Bug", "--assignee", "me", "--priority", "High", "--version", "v0.1.10")
+
+	if !sawAssigneeLookup {
+		t.Fatal("assignee lookup was not requested")
+	}
+	fields := gotPayload["customFields"].([]any)
+	if len(fields) != 4 {
+		t.Fatalf("customFields = %#v, want type, assignee, priority, version", fields)
+	}
+	if !strings.Contains(out, `Created ART-123: "Crash on save"`) {
+		t.Fatalf("issue create output = %q, want created issue", out)
+	}
+}
+
 func TestIssueShowPrintsIssueDetailsAndURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/issues/YR-14?fields=id,idReadable,summary,description,customFields(name,value(name,login))" {

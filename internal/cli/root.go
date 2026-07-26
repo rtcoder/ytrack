@@ -205,7 +205,7 @@ func (a *app) newIssueCommand() *cobra.Command {
 		Use:   "issue",
 		Short: "Manage YouTrack issues",
 	}
-	cmd.AddCommand(&cobra.Command{
+	createCmd := &cobra.Command{
 		Use:   "create <summary> [description]",
 		Short: "Create a YouTrack issue",
 		Args:  cobra.RangeArgs(1, 2),
@@ -221,7 +221,12 @@ func (a *app) newIssueCommand() *cobra.Command {
 			if len(args) == 2 {
 				description = args[1]
 			}
-			issue, raw, err := youtrack.NewClient(cfg.URL, cfg.Token).CreateIssue(context.Background(), cfg.ProjectID, args[0], description)
+			client := youtrack.NewClient(cfg.URL, cfg.Token)
+			opts, err := createIssueOptionsFromFlags(cmd, client)
+			if err != nil {
+				return err
+			}
+			issue, raw, err := client.CreateIssueWithOptions(context.Background(), cfg.ProjectID, args[0], description, opts)
 			if err != nil {
 				return err
 			}
@@ -232,7 +237,12 @@ func (a *app) newIssueCommand() *cobra.Command {
 			fmt.Fprintf(a.out, "Created %s: %q\n", issue.IDReadable, issue.Summary)
 			return nil
 		},
-	})
+	}
+	createCmd.Flags().String("type", "", "issue type")
+	createCmd.Flags().String("assignee", "", "issue assignee as me, user ID, login, name, or email")
+	createCmd.Flags().String("priority", "", "issue priority")
+	createCmd.Flags().String("version", "", "fix version")
+	cmd.AddCommand(createCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "show <issue-id>",
 		Short: "Show a YouTrack issue",
@@ -847,6 +857,39 @@ func issueUpdateFromFlags(cmd *cobra.Command) (youtrack.IssueUpdate, error) {
 		Type:        issueType,
 		Priority:    priority,
 	}, nil
+}
+
+func createIssueOptionsFromFlags(cmd *cobra.Command, client *youtrack.Client) (youtrack.CreateIssueOptions, error) {
+	issueType, err := cmd.Flags().GetString("type")
+	if err != nil {
+		return youtrack.CreateIssueOptions{}, err
+	}
+	assigneeRef, err := cmd.Flags().GetString("assignee")
+	if err != nil {
+		return youtrack.CreateIssueOptions{}, err
+	}
+	priority, err := cmd.Flags().GetString("priority")
+	if err != nil {
+		return youtrack.CreateIssueOptions{}, err
+	}
+	version, err := cmd.Flags().GetString("version")
+	if err != nil {
+		return youtrack.CreateIssueOptions{}, err
+	}
+
+	opts := youtrack.CreateIssueOptions{
+		Type:     issueType,
+		Priority: priority,
+		Version:  version,
+	}
+	if assigneeRef != "" {
+		user, err := client.ResolveUser(context.Background(), assigneeRef)
+		if err != nil {
+			return youtrack.CreateIssueOptions{}, err
+		}
+		opts.AssigneeID = user.ID
+	}
+	return opts, nil
 }
 
 func setField(cfg *config.Config, field, value string) {

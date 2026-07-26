@@ -248,6 +248,7 @@ ytrack unset-project-id
 ```sh
 ytrack issue create <summary>
 ytrack issue create <summary> <description>
+ytrack issue create <summary> [description] [--type <type>] [--assignee <user>] [--priority <priority>] [--version <version>]
 ytrack issue show <issue-id>
 ytrack issue edit <issue-id> [--title <title>] [--description <description>] [--type <type>] [--priority <priority>]
 ytrack issue type <issue-id> <type>
@@ -265,6 +266,12 @@ Create an issue with a summary and description:
 
 ```sh
 ytrack issue create "Crash on save" "Steps to reproduce..."
+```
+
+Create an issue with metadata:
+
+```sh
+ytrack issue create "Crash on save" "Steps to reproduce..." --type Bug --assignee me --priority High --version v0.1.10
 ```
 
 Change issue status:

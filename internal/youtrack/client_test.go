@@ -73,6 +73,47 @@ func TestCreateIssueOmitsEmptyDescription(t *testing.T) {
 	}
 }
 
+func TestCreateIssueWithOptionsPostsCustomFields(t *testing.T) {
+	var gotPayload map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":"2-1","idReadable":"ART-123","summary":"Crash on save"}`))
+	}))
+	defer server.Close()
+
+	opts := CreateIssueOptions{
+		Type:       "Bug",
+		AssigneeID: "1-2",
+		Priority:   "High",
+		Version:    "v0.1.10",
+	}
+	_, _, err := NewClient(server.URL, "perm:token").CreateIssueWithOptions(context.Background(), "0-1", "Crash on save", "Steps", opts)
+	if err != nil {
+		t.Fatalf("CreateIssueWithOptions() error = %v", err)
+	}
+
+	fields := gotPayload["customFields"].([]any)
+	if len(fields) != 4 {
+		t.Fatalf("customFields = %#v, want type, assignee, priority, version", fields)
+	}
+	if fields[0].(map[string]any)["name"] != "Type" {
+		t.Fatalf("first custom field = %#v, want Type", fields[0])
+	}
+	assignee := fields[1].(map[string]any)
+	assigneeValue := assignee["value"].(map[string]any)
+	if assignee["name"] != "Assignee" || assigneeValue["id"] != "1-2" {
+		t.Fatalf("assignee field = %#v, want Assignee 1-2", assignee)
+	}
+	version := fields[3].(map[string]any)
+	versionValues := version["value"].([]any)
+	if version["name"] != "Fix versions" || versionValues[0].(map[string]any)["name"] != "v0.1.10" {
+		t.Fatalf("version field = %#v, want Fix versions v0.1.10", version)
+	}
+}
+
 func TestSetStatusPostsCommandPayload(t *testing.T) {
 	var gotPath, gotAuth string
 	var gotPayload map[string]any
