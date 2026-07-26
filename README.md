@@ -168,3 +168,25 @@ GOOS=darwin GOARCH=arm64 go build -o dist/ytrack-darwin-arm64 ./cmd/ytrack
 GOOS=linux GOARCH=amd64 go build -o dist/ytrack-linux-amd64 ./cmd/ytrack
 GOOS=windows GOARCH=amd64 go build -o dist/ytrack-windows-amd64.exe ./cmd/ytrack
 ```
+
+## Releases
+
+GitHub Actions publishes release packages when a version tag is pushed:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+You can also run the `Release` workflow manually from GitHub Actions and provide
+an existing tag.
+
+The release workflow builds:
+
+- `darwin/amd64`
+- `darwin/arm64`
+- `linux/amd64`
+- `linux/arm64`
+- `windows/amd64`
+
+Each release includes compressed packages plus `checksums.txt`.
