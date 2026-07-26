@@ -248,6 +248,7 @@ ytrack unset-project-id
 ```sh
 ytrack issue create <summary>
 ytrack issue create <summary> <description>
+ytrack issue show <issue-id>
 ytrack issue status <issue-id> <status>
 ```
 
@@ -268,6 +269,12 @@ Change issue status:
 ```sh
 ytrack issue status ART-123 Done
 ytrack issue status ART-123 "In Progress"
+```
+
+Show issue details:
+
+```sh
+ytrack issue show ART-123
 ```
 
 `issue status` sends a YouTrack command in this form:
@@ -381,6 +388,7 @@ Use `--json` before the command:
 ```sh
 ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
+ytrack --json issue show ART-123
 ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20

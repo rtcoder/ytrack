@@ -357,6 +357,28 @@ func TestListProjectUsersRequestsProjectTeamUsers(t *testing.T) {
 	}
 }
 
+func TestGetIssueRequestsIssueDetails(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","description":"Interactive setup","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"},{"name":"Assignee","value":{"login":"rtcoder","name":"Robert","$type":"User"},"$type":"SingleUserIssueCustomField"},{"name":"Priority","value":{"name":"Normal","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	issue, raw, err := NewClient(server.URL, "perm:token").GetIssue(context.Background(), "YR-14")
+	if err != nil {
+		t.Fatalf("GetIssue() error = %v", err)
+	}
+
+	wantPath := "/api/issues/YR-14?fields=id,idReadable,summary,description,customFields(name,value(name,login))"
+	if gotPath != wantPath {
+		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	}
+	if issue.IDReadable != "YR-14" || issue.Summary != "Add init" || issue.Description != "Interactive setup" || string(raw) == "" {
+		t.Fatalf("GetIssue() issue=%+v raw=%q, want parsed issue and raw JSON", issue, string(raw))
+	}
+}
+
 func TestListProjectBundleValuesFiltersCustomFieldBundles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/admin/projects/0-3/customFields?fields=id,field(name),bundle(values(id,name))" {

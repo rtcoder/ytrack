@@ -234,6 +234,30 @@ func (a *app) newIssueCommand() *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "show <issue-id>",
+		Short: "Show a YouTrack issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.LoadEffective(a.paths)
+			if err != nil {
+				return err
+			}
+			if err := config.Require(cfg, "url", "token"); err != nil {
+				return err
+			}
+			issue, raw, err := youtrack.NewClient(cfg.URL, cfg.Token).GetIssue(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			a.printIssueDetails(issue, cfg.URL)
+			return nil
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "status <issue-id> <status>",
 		Short: "Set a YouTrack issue status",
 		Args:  cobra.ExactArgs(2),
@@ -637,6 +661,18 @@ func (a *app) printProjectIssues(issues []youtrack.ProjectIssue) {
 	_ = w.Flush()
 }
 
+func (a *app) printIssueDetails(issue youtrack.ProjectIssue, baseURL string) {
+	fmt.Fprintf(a.out, "id: %s\n", issue.IDReadable)
+	fmt.Fprintf(a.out, "title: %s\n", issue.Summary)
+	if issue.Description != "" {
+		fmt.Fprintf(a.out, "description: %s\n", issue.Description)
+	}
+	fmt.Fprintf(a.out, "state: %s\n", issueFieldValue(issue, "State"))
+	fmt.Fprintf(a.out, "assignee: %s\n", issueFieldValue(issue, "Assignee"))
+	fmt.Fprintf(a.out, "priority: %s\n", issueFieldValue(issue, "Priority"))
+	fmt.Fprintf(a.out, "url: %s/issue/%s\n", strings.TrimRight(baseURL, "/"), issue.IDReadable)
+}
+
 func (a *app) printNamedValues(values []youtrack.NamedValue) {
 	w := tabwriter.NewWriter(a.out, 0, 0, 2, ' ', 0)
 	for _, value := range values {
@@ -659,11 +695,11 @@ func issueFieldValue(issue youtrack.ProjectIssue, name string) string {
 		}
 		switch value := field.Value.(type) {
 		case map[string]any:
-			if name, ok := value["name"].(string); ok {
-				return name
-			}
 			if login, ok := value["login"].(string); ok {
 				return login
+			}
+			if name, ok := value["name"].(string); ok {
+				return name
 			}
 		case []any:
 			var parts []string

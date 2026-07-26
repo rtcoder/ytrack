@@ -70,6 +70,49 @@ func TestIssueCreateJSONUsesEffectiveConfig(t *testing.T) {
 	}
 }
 
+func TestIssueShowPrintsIssueDetailsAndURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/api/issues/YR-14?fields=id,idReadable,summary,description,customFields(name,value(name,login))" {
+			t.Fatalf("path = %q, want issue details", r.URL.RequestURI())
+		}
+		_, _ = w.Write([]byte(`{"id":"3-1","idReadable":"YR-14","summary":"Add init","description":"Interactive setup","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"},{"name":"Assignee","value":{"login":"rtcoder","name":"Robert","$type":"User"},"$type":"SingleUserIssueCustomField"},{"name":"Priority","value":{"name":"Normal","$type":"EnumBundleElement"},"$type":"SingleEnumIssueCustomField"}],"$type":"Issue"}`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "issue", "show", "YR-14")
+
+	for _, want := range []string{
+		"id: YR-14",
+		"title: Add init",
+		"state: Submitted",
+		"assignee: rtcoder",
+		"priority: Normal",
+		"url: " + server.URL + "/issue/YR-14",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("issue show output = %q, want %q", out, want)
+		}
+	}
+}
+
+func TestIssueShowJSONPrintsRawResponse(t *testing.T) {
+	raw := `{"id":"3-1","idReadable":"YR-14","summary":"Add init","description":"Interactive setup","customFields":[],"$type":"Issue"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(raw))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+
+	out := runCLI(t, paths, "--json", "issue", "show", "YR-14")
+
+	if strings.TrimSpace(out) != raw {
+		t.Fatalf("issue show json output = %q, want raw JSON", out)
+	}
+}
+
 func TestUserMePrintsCurrentUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"id":"1-2","login":"rtcoder","name":"Robert","fullName":"Robert","email":"robert@example.com","$type":"Me"}`))

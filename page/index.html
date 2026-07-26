@@ -371,6 +371,7 @@ ytrack global set-token perm:your-token
 ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce"
+ytrack issue show YR-14
 ytrack issue status ART-123 Done
 ytrack user me
 ytrack project create "Mobile App" --key MOB --leader me --set-project-id</code></pre>
@@ -440,6 +441,7 @@ ytrack global set-token perm:your-token
 ytrack set-project-id 0-1
 
 ytrack issue create "Crash on save" "Steps to reproduce..."
+ytrack issue show YR-14
 ytrack issue status ART-123 Done
 ytrack user list --top 20
 ytrack project create "Mobile App" --key MOB --leader rtcoder --set-project-id</code></pre>
@@ -502,6 +504,7 @@ ytrack unset-project-id</code></pre>
               </div>
               <pre><code>ytrack issue create &lt;summary&gt;
 ytrack issue create &lt;summary&gt; &lt;description&gt;
+ytrack issue show &lt;issue-id&gt;
 ytrack issue status &lt;issue-id&gt; &lt;status&gt;</code></pre>
             </article>
 
@@ -603,6 +606,7 @@ project_id: 0-1</code></pre>
             </div>
             <pre><code>ytrack --json issue create "Crash on save"
 ytrack --json issue create "Crash on save" "Steps to reproduce..."
+ytrack --json issue show ART-123
 ytrack --json issue status ART-123 Done
 ytrack --json user me
 ytrack --json user list --top 20

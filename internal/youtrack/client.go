@@ -33,6 +33,7 @@ type ProjectIssue struct {
 	ID           string             `json:"id"`
 	IDReadable   string             `json:"idReadable"`
 	Summary      string             `json:"summary"`
+	Description  string             `json:"description"`
 	CustomFields []IssueCustomField `json:"customFields"`
 }
 
@@ -118,6 +119,19 @@ func (c *Client) SetStatus(ctx context.Context, issueID, status string) (Command
 		return CommandResult{}, raw, fmt.Errorf("parse set status response: %w", err)
 	}
 	return result, raw, nil
+}
+
+func (c *Client) GetIssue(ctx context.Context, issueID string) (ProjectIssue, []byte, error) {
+	var issue ProjectIssue
+	path := "/api/issues/" + url.PathEscape(issueID) + "?fields=id,idReadable,summary,description,customFields(name,value(name,login))"
+	raw, err := c.doNoBody(ctx, http.MethodGet, path)
+	if err != nil {
+		return ProjectIssue{}, nil, err
+	}
+	if err := json.Unmarshal(raw, &issue); err != nil {
+		return ProjectIssue{}, raw, fmt.Errorf("parse issue response: %w", err)
+	}
+	return issue, raw, nil
 }
 
 func (c *Client) GetMe(ctx context.Context) (User, []byte, error) {
