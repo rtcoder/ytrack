@@ -120,6 +120,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -145,18 +147,12 @@ jobs:
         run: gh release create "${RELEASE_TAG}" dist/* --verify-tag --generate-notes --title "${RELEASE_TAG}"
 
       - name: Update Homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
 
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "HOMEBREW_TAP_TOKEN is not configured; skipping tap update."
-            exit 0
-          fi
-
-          gh api repos/rtcoder/homebrew-tap/dispatches \
-            --method POST \
-            --field event_type=ytrack-release \
-            --field client_payload[tag]="${RELEASE_TAG}"
+          version="${RELEASE_TAG#v}"
+          bash .github/scripts/update-homebrew-tap.sh "${version}" "dist/checksums.txt"

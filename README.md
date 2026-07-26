@@ -27,6 +27,18 @@ Or install into your Go bin directory:
 go install ./cmd/ytrack
 ```
 
+Install with Homebrew after the first tagged release:
+
+```sh
+brew install rtcoder/tap/ytrack
+```
+
+Before the first release, install the development version from the tap:
+
+```sh
+brew install --HEAD rtcoder/tap/ytrack
+```
+
 ## Configuration
 
 Configuration is merged at runtime with this priority:
@@ -190,6 +202,9 @@ The release workflow builds:
 - `windows/amd64`
 
 Each release includes compressed packages plus `checksums.txt`.
+
+If `HOMEBREW_TAP_TOKEN` is configured as a repository secret, the release workflow
+also updates `rtcoder/homebrew-tap` with release URLs and SHA-256 checksums.
 
 ## GitHub Pages
 

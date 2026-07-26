@@ -1,0 +1,55 @@
+name: Update Homebrew Tap
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "ytrack version to publish to Homebrew, for example 0.1.0 or v0.1.0"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+jobs:
+  update-homebrew-tap:
+    name: Update Homebrew formula
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify token
+        shell: bash
+        run: |
+          test -n "${HOMEBREW_TAP_TOKEN}"
+
+      - name: Resolve release checksums
+        id: checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          version="${INPUT_VERSION#v}"
+          tag="v${version}"
+          gh release download "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern checksums.txt \
+            --dir "${RUNNER_TEMP}/ytrack-release"
+
+          test -s "${RUNNER_TEMP}/ytrack-release/checksums.txt"
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "checksum_file=${RUNNER_TEMP}/ytrack-release/checksums.txt" >> "${GITHUB_OUTPUT}"
+
+      - name: Update tap
+        shell: bash
+        run: |
+          bash .github/scripts/update-homebrew-tap.sh \
+            "${{ steps.checksum.outputs.version }}" \
+            "${{ steps.checksum.outputs.checksum_file }}"
