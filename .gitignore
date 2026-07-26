@@ -1,0 +1,7 @@
+.ytrack/
+.gocache/
+.idea/
+ytrack
+ytrack.exe
+dist/
+coverage.out
