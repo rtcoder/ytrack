@@ -258,6 +258,37 @@ func (a *app) newIssueCommand() *cobra.Command {
 	createCmd.Flags().String("priority", "", "issue priority")
 	createCmd.Flags().String("version", "", "fix version")
 	cmd.AddCommand(createCmd)
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List issues in the configured project",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.LoadEffective(a.paths)
+			if err != nil {
+				return err
+			}
+			if err := config.Require(cfg, "url", "token", "project_id"); err != nil {
+				return err
+			}
+			filters, err := issueListFiltersFromFlags(cmd)
+			if err != nil {
+				return err
+			}
+			issues, raw, err := youtrack.NewClient(cfg.URL, cfg.Token).ListProjectIssuesFiltered(context.Background(), cfg.ProjectID, filters)
+			if err != nil {
+				return err
+			}
+			if a.jsonOutput {
+				fmt.Fprintf(a.out, "%s\n", raw)
+				return nil
+			}
+			a.printProjectIssues(issues)
+			return nil
+		},
+	}
+	listCmd.Flags().String("state", "", "filter issues by state")
+	listCmd.Flags().String("assigned-to", "", "filter issues by assignee")
+	cmd.AddCommand(listCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "show <issue-id>",
 		Short: "Show a YouTrack issue",
@@ -956,6 +987,21 @@ func issueFiltersFromFlags(cmd *cobra.Command) (youtrack.IssueFilters, error) {
 		User:     user,
 		Type:     issueType,
 		Priority: priority,
+	}, nil
+}
+
+func issueListFiltersFromFlags(cmd *cobra.Command) (youtrack.IssueFilters, error) {
+	state, err := cmd.Flags().GetString("state")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	assignedTo, err := cmd.Flags().GetString("assigned-to")
+	if err != nil {
+		return youtrack.IssueFilters{}, err
+	}
+	return youtrack.IssueFilters{
+		Status: state,
+		User:   assignedTo,
 	}, nil
 }
 

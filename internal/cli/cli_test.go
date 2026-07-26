@@ -196,6 +196,53 @@ func TestIssueCloseSetsStatusToFixed(t *testing.T) {
 	}
 }
 
+func TestIssueListListsConfiguredProjectIssues(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[{"name":"State","value":{"name":"Submitted","$type":"StateBundleElement"},"$type":"StateIssueCustomField"}],"$type":"Issue"}]`))
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-3")
+
+	out := runCLI(t, paths, "issue", "list")
+
+	if gotPath != "/api/admin/projects/0-3/issues?fields=id,idReadable,summary,customFields(name,value(name,login))" {
+		t.Fatalf("path = %q, want project issue list", gotPath)
+	}
+	if !strings.Contains(out, "YR-14") || !strings.Contains(out, "Submitted") || !strings.Contains(out, "Add init") {
+		t.Fatalf("issue list output = %q, want issue row", out)
+	}
+}
+
+func TestIssueListSupportsStateAndAssigneeFilters(t *testing.T) {
+	var requested []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.RequestURI())
+		switch r.URL.Path {
+		case "/api/admin/projects/0-3":
+			_, _ = w.Write([]byte(`{"id":"0-3","shortName":"YR","name":"ytrack","$type":"Project"}`))
+		case "/api/issues":
+			_, _ = w.Write([]byte(`[{"id":"3-1","idReadable":"YR-14","summary":"Add init","customFields":[],"$type":"Issue"}]`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	paths := configuredPaths(t, server.URL)
+	runCLI(t, paths, "set-project-id", "0-3")
+
+	runCLI(t, paths, "issue", "list", "--state", "Submitted", "--assigned-to", "me")
+
+	wantIssuesPath := "/api/issues?fields=id%2CidReadable%2Csummary%2CcustomFields%28name%2Cvalue%28name%2Clogin%29%29&query=project%3A+YR+State%3A+%7BSubmitted%7D+Assignee%3A+%7Bme%7D"
+	if len(requested) != 2 || requested[1] != wantIssuesPath {
+		t.Fatalf("requested = %#v, want filtered issue search", requested)
+	}
+}
+
 func TestIssueShowPrintsIssueDetailsAndURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RequestURI() != "/api/issues/YR-14?fields=id,idReadable,summary,description,customFields(name,value(name,login))" {

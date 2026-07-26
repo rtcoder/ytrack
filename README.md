@@ -251,6 +251,9 @@ ytrack issue create <summary> <description>
 ytrack issue create <summary> --description-file <path>
 ytrack issue create <summary> --description-file -
 ytrack issue create <summary> [description] [--type <type>] [--assignee <user>] [--priority <priority>] [--version <version>]
+ytrack issue list
+ytrack issue list --state <value>
+ytrack issue list --assigned-to <user>
 ytrack issue show <issue-id>
 ytrack issue edit <issue-id> [--title <title>] [--description <description>] [--type <type>] [--priority <priority>]
 ytrack issue type <issue-id> <type>
@@ -285,6 +288,14 @@ Create an issue with a longer description from a file or stdin:
 ```sh
 ytrack issue create "Crash on save" --description-file bug.md
 cat bug.md | ytrack issue create "Crash on save" --description-file -
+```
+
+List issues in the configured local project:
+
+```sh
+ytrack issue list
+ytrack issue list --state Submitted
+ytrack issue list --assigned-to me
 ```
 
 Change issue status:
