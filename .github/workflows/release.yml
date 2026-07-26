@@ -106,6 +106,14 @@ jobs:
             tar -C build -czf "package/${package_name}.tar.gz" "${binary_name}" LICENSE README.md
           fi
 
+          if [ "${GOOS}" = "linux" ]; then
+            go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+            nfpm_bin="$(go env GOPATH)/bin/nfpm"
+
+            VERSION="${version}" "${nfpm_bin}" pkg --config nfpm.yaml --packager deb --target "package/${package_name}.deb"
+            VERSION="${version}" "${nfpm_bin}" pkg --config nfpm.yaml --packager rpm --target "package/${package_name}.rpm"
+          fi
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:

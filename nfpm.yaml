@@ -1,0 +1,26 @@
+name: ytrack
+arch: ${GOARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+release: 1
+section: utils
+priority: optional
+maintainer: rtcoder <rtcoder@users.noreply.github.com>
+description: Small cross-platform command-line client for YouTrack.
+vendor: rtcoder
+homepage: https://github.com/rtcoder/ytrack
+license: MIT
+contents:
+  - src: build/ytrack
+    dst: /usr/bin/ytrack
+    file_info:
+      mode: 0755
+  - src: LICENSE
+    dst: /usr/share/doc/ytrack/LICENSE
+    file_info:
+      mode: 0644
+  - src: README.md
+    dst: /usr/share/doc/ytrack/README.md
+    file_info:
+      mode: 0644

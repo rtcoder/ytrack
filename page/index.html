@@ -379,7 +379,6 @@ ytrack issue status ART-123 Done</code></pre>
           <h2>Install</h2>
           <p class="section-lead">
             Install from Homebrew, download a release binary, or build from source.
-            A WinGet package submission is in progress for Windows users.
           </p>
           <div class="grid">
             <article class="card">
@@ -389,10 +388,10 @@ ytrack issue status ART-123 Done</code></pre>
               <p>Development builds are available with <code>brew install --HEAD rtcoder/tap/ytrack</code>.</p>
             </article>
             <article class="card">
-              <span class="pill">Windows</span>
-              <h3>WinGet</h3>
-              <pre><code>winget install rtcoder.ytrack</code></pre>
-              <p>Until the package is accepted, download <code>ytrack.exe</code> from GitHub Releases.</p>
+              <span class="pill">Release</span>
+              <h3>GitHub Releases</h3>
+              <pre><code>github.com/rtcoder/ytrack/releases</code></pre>
+              <p>Download tarballs, Windows binaries, or Linux <code>.deb</code> and <code>.rpm</code> packages.</p>
             </article>
             <article class="card">
               <span class="pill">Source</span>
@@ -623,7 +622,8 @@ GOOS=windows GOARCH=amd64 go build -o dist/ytrack-windows-amd64.exe ./cmd/ytrack
           <h2>Releases</h2>
           <p class="section-lead">
             GitHub Actions publishes release assets when a version tag is pushed.
-            Release packages include platform builds and <code>checksums.txt</code>.
+            Release packages include platform builds, Linux <code>.deb</code> and <code>.rpm</code>
+            packages, and <code>checksums.txt</code>.
           </p>
           <div class="terminal" aria-label="Release commands">
             <div class="terminal-bar">

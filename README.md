@@ -27,16 +27,6 @@ Development builds from the main branch are available with:
 brew install --HEAD rtcoder/tap/ytrack
 ```
 
-### WinGet
-
-The WinGet package submission is in progress. After it is accepted:
-
-```powershell
-winget install rtcoder.ytrack
-```
-
-Until then, download `ytrack.exe` from the latest GitHub release.
-
 ### GitHub Releases
 
 Download a release package from:
@@ -45,13 +35,29 @@ Download a release package from:
 https://github.com/rtcoder/ytrack/releases
 ```
 
+Debian/Ubuntu users can install the release `.deb` package:
+
+```sh
+sudo apt install ./ytrack_<version>_linux_amd64.deb
+```
+
+Fedora/RHEL users can install the release `.rpm` package:
+
+```sh
+sudo dnf install ./ytrack_<version>_linux_amd64.rpm
+```
+
 Release assets include:
 
 - macOS Intel: `ytrack_<version>_darwin_amd64.tar.gz`
 - macOS Apple silicon: `ytrack_<version>_darwin_arm64.tar.gz`
 - Linux x64: `ytrack_<version>_linux_amd64.tar.gz`
 - Linux ARM64: `ytrack_<version>_linux_arm64.tar.gz`
-- Windows x64: `ytrack.exe`
+- Debian/Ubuntu x64: `ytrack_<version>_linux_amd64.deb`
+- Debian/Ubuntu ARM64: `ytrack_<version>_linux_arm64.deb`
+- Fedora/RHEL x64: `ytrack_<version>_linux_amd64.rpm`
+- Fedora/RHEL ARM64: `ytrack_<version>_linux_arm64.rpm`
+- Windows x64: `ytrack_<version>_windows_amd64.zip`
 - SHA-256 hashes: `checksums.txt`
 
 ### Build From Source
@@ -336,8 +342,9 @@ The release workflow:
 
 1. runs tests
 2. builds Linux, macOS, and Windows binaries
-3. uploads release assets and `checksums.txt`
-4. updates `rtcoder/homebrew-tap` when `HOMEBREW_TAP_TOKEN` is configured
+3. packages Linux `.deb` and `.rpm` release assets
+4. uploads release assets and `checksums.txt`
+5. updates `rtcoder/homebrew-tap` when `HOMEBREW_TAP_TOKEN` is configured
 
 ## License
 
