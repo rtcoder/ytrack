@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="ytrack is a cross-platform command-line client for creating and updating YouTrack issues."
+      content="Complete documentation for ytrack, a cross-platform YouTrack command-line client."
     >
-    <title>ytrack - YouTrack CLI</title>
+    <title>ytrack - YouTrack CLI Documentation</title>
     <style>
       :root {
         color-scheme: light;
@@ -20,11 +20,16 @@
         --accent-strong: #115e59;
         --code-bg: #111827;
         --code-ink: #f9fafb;
+        --soft: #e8f3f1;
         --shadow: 0 18px 45px rgb(24 32 42 / 10%);
       }
 
       * {
         box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
       }
 
       body {
@@ -50,7 +55,7 @@
 
       header {
         border-bottom: 1px solid var(--line);
-        background: rgb(246 247 249 / 90%);
+        background: rgb(246 247 249 / 92%);
         backdrop-filter: blur(12px);
         position: sticky;
         top: 0;
@@ -58,11 +63,11 @@
       }
 
       nav {
-        display: flex;
         align-items: center;
+        display: flex;
+        gap: 24px;
         justify-content: space-between;
         min-height: 64px;
-        gap: 24px;
       }
 
       .brand {
@@ -76,9 +81,9 @@
       .links {
         display: flex;
         flex-wrap: wrap;
+        gap: 16px;
         justify-content: flex-end;
-        gap: 18px;
-        font-size: 0.95rem;
+        font-size: 0.93rem;
       }
 
       .links a {
@@ -88,10 +93,10 @@
 
       .hero {
         display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
         gap: 48px;
-        align-items: center;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
         padding: 72px 0 58px;
+        align-items: center;
       }
 
       .eyebrow {
@@ -115,6 +120,18 @@
         line-height: 0.92;
         letter-spacing: 0;
         margin-bottom: 24px;
+      }
+
+      h2 {
+        font-size: clamp(1.75rem, 4vw, 2.65rem);
+        line-height: 1.08;
+        letter-spacing: 0;
+        margin-bottom: 18px;
+      }
+
+      h3 {
+        font-size: 1.05rem;
+        margin-bottom: 8px;
       }
 
       .lead {
@@ -202,16 +219,9 @@
         padding: 54px 0;
       }
 
-      h2 {
-        font-size: clamp(1.8rem, 4vw, 2.8rem);
-        line-height: 1.05;
-        letter-spacing: 0;
-        margin-bottom: 18px;
-      }
-
       .section-lead {
         color: var(--muted);
-        max-width: 720px;
+        max-width: 760px;
       }
 
       .grid {
@@ -221,6 +231,10 @@
         margin-top: 28px;
       }
 
+      .two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .card {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -228,13 +242,13 @@
         padding: 22px;
       }
 
-      .card h3 {
-        font-size: 1.05rem;
-        margin-bottom: 8px;
+      .card p,
+      .card li {
+        color: var(--muted);
       }
 
-      .card p {
-        color: var(--muted);
+      .card p:last-child,
+      .card ul:last-child {
         margin-bottom: 0;
       }
 
@@ -245,15 +259,50 @@
         margin-top: 28px;
       }
 
+      .command-list {
+        display: grid;
+        gap: 18px;
+        margin-top: 28px;
+      }
+
+      .command-list article {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(180px, 0.35fr) minmax(0, 0.65fr);
+      }
+
+      .pill {
+        background: var(--soft);
+        border: 1px solid #c6e2dc;
+        border-radius: 999px;
+        color: var(--accent-strong);
+        display: inline-flex;
+        font-size: 0.82rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+        padding: 4px 10px;
+      }
+
+      .note {
+        background: var(--soft);
+        border: 1px solid #c6e2dc;
+        border-radius: 8px;
+        color: var(--accent-strong);
+        font-weight: 700;
+        margin-top: 18px;
+        padding: 14px 16px;
+      }
+
       footer {
         color: var(--muted);
         padding: 34px 0 46px;
       }
 
-      @media (max-width: 820px) {
+      @media (max-width: 860px) {
         nav,
         .hero,
-        .steps {
+        .steps,
+        .command-list article {
           grid-template-columns: 1fr;
         }
 
@@ -272,7 +321,8 @@
           padding-top: 46px;
         }
 
-        .grid {
+        .grid,
+        .two {
           grid-template-columns: 1fr;
         }
       }
@@ -284,7 +334,10 @@
         <a class="brand" href="#">ytrack</a>
         <div class="links">
           <a href="#install">Install</a>
-          <a href="#usage">Usage</a>
+          <a href="#quick-start">Quick Start</a>
+          <a href="#commands">Commands</a>
+          <a href="#config">Config</a>
+          <a href="#development">Development</a>
           <a href="https://github.com/rtcoder/ytrack">GitHub</a>
         </div>
       </nav>
@@ -296,11 +349,12 @@
           <p class="eyebrow">YouTrack from the terminal</p>
           <h1>ytrack</h1>
           <p class="lead">
-            A small cross-platform CLI for creating YouTrack issues, moving their
-            status, and keeping global credentials separate from per-project config.
+            A cross-platform CLI for creating YouTrack issues, moving their status,
+            and keeping global credentials separate from per-project configuration.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/rtcoder/ytrack/releases">Download</a>
+            <a class="button" href="#commands">Read Docs</a>
             <a class="button" href="https://github.com/rtcoder/ytrack">View Source</a>
           </div>
         </div>
@@ -322,53 +376,263 @@ ytrack issue status ART-123 Done</code></pre>
 
       <section id="install">
         <div class="shell">
-          <h2>Install a release binary</h2>
+          <h2>Install</h2>
           <p class="section-lead">
-            Grab the package for your platform from GitHub Releases. Each release includes
-            Linux, macOS, and Windows builds plus SHA-256 checksums.
+            Install from Homebrew, download a release binary, or build from source.
+            A WinGet package submission is in progress for Windows users.
           </p>
           <div class="grid">
             <article class="card">
-              <h3>macOS</h3>
-              <p>Download the Darwin archive for Intel or Apple silicon.</p>
+              <span class="pill">macOS / Linux</span>
+              <h3>Homebrew</h3>
+              <pre><code>brew install rtcoder/tap/ytrack</code></pre>
+              <p>Development builds are available with <code>brew install --HEAD rtcoder/tap/ytrack</code>.</p>
             </article>
             <article class="card">
-              <h3>Linux</h3>
-              <p>Use the AMD64 or ARM64 archive and place the binary on your PATH.</p>
+              <span class="pill">Windows</span>
+              <h3>WinGet</h3>
+              <pre><code>winget install rtcoder.ytrack</code></pre>
+              <p>Until the package is accepted, download <code>ytrack.exe</code> from GitHub Releases.</p>
             </article>
             <article class="card">
-              <h3>Windows</h3>
-              <p>Download the ZIP package and run <code>ytrack.exe</code>.</p>
+              <span class="pill">Source</span>
+              <h3>Go</h3>
+              <pre><code>go install ./cmd/ytrack</code></pre>
+              <p>Use <code>go build -o ytrack ./cmd/ytrack</code> when working from a local checkout.</p>
             </article>
           </div>
         </div>
       </section>
 
-      <section id="usage">
+      <section id="quick-start">
         <div class="shell">
-          <h2>Config that follows your work</h2>
+          <h2>Quick Start</h2>
           <p class="section-lead">
-            Store the YouTrack URL and token globally, then keep the project ID inside
-            each repository's local <code>.ytrack/config.json</code>.
+            Configure shared credentials once, set a project ID inside each repository,
+            then create and update issues from the terminal.
           </p>
           <div class="steps">
             <div class="card">
-              <h3>Layered config</h3>
-              <p>
-                Local values override global values, while <code>project_id</code> stays
-                local-only to avoid creating issues in the wrong project.
-              </p>
+              <h3>Setup Flow</h3>
+              <ol>
+                <li>Set the global YouTrack URL.</li>
+                <li>Store a permanent token globally.</li>
+                <li>Set the local project ID in your repository.</li>
+                <li>Create or update issues.</li>
+              </ol>
             </div>
-            <div class="terminal" aria-label="Configuration commands">
+            <div class="terminal" aria-label="Quick start commands">
               <div class="terminal-bar">
                 <span class="dot red"></span>
                 <span class="dot yellow"></span>
                 <span class="dot green"></span>
               </div>
-              <pre><code>ytrack show
-ytrack --json issue create "Add release docs"
-ytrack issue status ART-123 In Progress</code></pre>
+              <pre><code>ytrack global set-url https://youtrack.example.com
+ytrack global set-token perm:your-token
+ytrack set-project-id 0-1
+
+ytrack issue create "Crash on save" "Steps to reproduce..."
+ytrack issue status ART-123 Done</code></pre>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="commands">
+        <div class="shell">
+          <h2>Command Reference</h2>
+          <p class="section-lead">
+            These are all commands currently exposed by the CLI.
+          </p>
+
+          <div class="command-list">
+            <article class="card">
+              <div>
+                <span class="pill">Global Options</span>
+                <h3>Help and JSON</h3>
+                <p>Use JSON output for API-backed commands when scripting.</p>
+              </div>
+              <pre><code>ytrack --help
+ytrack --json &lt;command&gt;</code></pre>
+            </article>
+
+            <article class="card">
+              <div>
+                <span class="pill">Global Config</span>
+                <h3>Shared URL and Token</h3>
+                <p>Best for values reused across repositories.</p>
+              </div>
+              <pre><code>ytrack global show
+ytrack global set-url &lt;url&gt;
+ytrack global set-token &lt;token&gt;
+ytrack global unset-url
+ytrack global unset-token</code></pre>
+            </article>
+
+            <article class="card">
+              <div>
+                <span class="pill">Local Config</span>
+                <h3>Repository Settings</h3>
+                <p>Best for project IDs and repository-specific overrides.</p>
+              </div>
+              <pre><code>ytrack show
+ytrack set-url &lt;url&gt;
+ytrack set-token &lt;token&gt;
+ytrack set-project-id &lt;project-id&gt;
+ytrack unset-url
+ytrack unset-token
+ytrack unset-project-id</code></pre>
+            </article>
+
+            <article class="card">
+              <div>
+                <span class="pill">Issues</span>
+                <h3>Create and Update</h3>
+                <p>Create issues and send YouTrack state-change commands.</p>
+              </div>
+              <pre><code>ytrack issue create &lt;summary&gt;
+ytrack issue create &lt;summary&gt; &lt;description&gt;
+ytrack issue status &lt;issue-id&gt; &lt;status&gt;</code></pre>
+            </article>
+          </div>
+
+          <div class="note">
+            There is no <code>ytrack global set-project-id</code>. Project IDs are local-only by design.
+          </div>
+        </div>
+      </section>
+
+      <section id="config">
+        <div class="shell">
+          <h2>Configuration</h2>
+          <p class="section-lead">
+            Local configuration overrides global configuration. Tokens are masked when
+            printed, and local config should be ignored by Git.
+          </p>
+          <div class="grid two">
+            <article class="card">
+              <h3>Merge Order</h3>
+              <pre><code>local ./.ytrack/config.json
+  &gt; global OS user config</code></pre>
+              <p><code>project_id</code> is never stored globally, which reduces the chance of creating issues in the wrong YouTrack project.</p>
+            </article>
+            <article class="card">
+              <h3>Config Paths</h3>
+              <ul>
+                <li>macOS: <code>~/Library/Application Support/ytrack/config.json</code></li>
+                <li>Linux: <code>~/.config/ytrack/config.json</code></li>
+                <li>Windows: <code>%APPDATA%\ytrack\config.json</code></li>
+                <li>Local: <code>./.ytrack/config.json</code></li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="steps">
+            <div class="card">
+              <h3>Show Output</h3>
+              <p><code>ytrack show</code> prints the effective merged config. Secret tokens are masked.</p>
+            </div>
+            <div class="terminal" aria-label="Show command output">
+              <div class="terminal-bar">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+              </div>
+              <pre><code>url: https://youtrack.example.com
+token: perm:xxxx...abcd
+project_id: 0-1</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="json">
+        <div class="shell">
+          <h2>JSON and Scripting</h2>
+          <p class="section-lead">
+            Put <code>--json</code> before the command to print raw YouTrack API responses.
+          </p>
+          <div class="terminal" aria-label="JSON command examples">
+            <div class="terminal-bar">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <pre><code>ytrack --json issue create "Crash on save"
+ytrack --json issue create "Crash on save" "Steps to reproduce..."
+ytrack --json issue status ART-123 Done</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="requirements">
+        <div class="shell">
+          <h2>Required Configuration</h2>
+          <div class="grid two">
+            <article class="card">
+              <h3><code>issue create</code></h3>
+              <ul>
+                <li><code>url</code></li>
+                <li><code>token</code></li>
+                <li>local <code>project_id</code></li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3><code>issue status</code></h3>
+              <ul>
+                <li><code>url</code></li>
+                <li><code>token</code></li>
+              </ul>
+            </article>
+          </div>
+          <div class="note">
+            Missing values produce actionable errors, such as
+            <code>missing configured project_id, run `ytrack set-project-id &lt;project-id&gt;`</code>.
+          </div>
+        </div>
+      </section>
+
+      <section id="development">
+        <div class="shell">
+          <h2>Development</h2>
+          <div class="grid two">
+            <article class="card">
+              <h3>Test</h3>
+              <pre><code>go test ./...</code></pre>
+            </article>
+            <article class="card">
+              <h3>Build</h3>
+              <pre><code>go build -o ytrack ./cmd/ytrack</code></pre>
+            </article>
+          </div>
+          <div class="terminal" aria-label="Cross compile examples">
+            <div class="terminal-bar">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <pre><code>GOOS=darwin GOARCH=arm64 go build -o dist/ytrack-darwin-arm64 ./cmd/ytrack
+GOOS=linux GOARCH=amd64 go build -o dist/ytrack-linux-amd64 ./cmd/ytrack
+GOOS=windows GOARCH=amd64 go build -o dist/ytrack-windows-amd64.exe ./cmd/ytrack</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="releases">
+        <div class="shell">
+          <h2>Releases</h2>
+          <p class="section-lead">
+            GitHub Actions publishes release assets when a version tag is pushed.
+            Release packages include platform builds and <code>checksums.txt</code>.
+          </p>
+          <div class="terminal" aria-label="Release commands">
+            <div class="terminal-bar">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <pre><code>git tag v0.1.1
+git push origin v0.1.1</code></pre>
           </div>
         </div>
       </section>
@@ -381,4 +645,3 @@ ytrack issue status ART-123 In Progress</code></pre>
     </footer>
   </body>
 </html>
-
