@@ -1,7 +1,7 @@
 .ytrack/
 .gocache/
 .idea/
-ytrack
-ytrack.exe
+/ytrack
+/ytrack.exe
 dist/
 coverage.out
